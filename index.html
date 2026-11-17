@@ -3,6 +3,23 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#161616"><title>CLA-3A — Classic Compressors</title>
+  <script id="startup-diagnostics">
+  (()=>{
+    const bridge=globalThis.chrome?.webview;
+    if(!bridge)return;
+    const report=message=>{try{bridge.postMessage(message);}catch{}};
+    globalThis.__claStartup=stage=>report('diagnostic:'+stage);
+    addEventListener('error',event=>{
+      if(event.target!==globalThis){
+        const resource=event.target?.src||event.target?.href;
+        if(resource)report('startup-error:resource '+resource.split('/').pop().split('?')[0]);
+      }else report('startup-error:'+String(event.message||'script error').slice(0,200)+' line '+(event.lineno||0));
+    },true);
+    addEventListener('unhandledrejection',()=>report('startup-error:unhandled promise rejection'));
+    addEventListener('DOMContentLoaded',()=>report('diagnostic:DOM content loaded'));
+    report('diagnostic:HTML bootstrap running');
+  })();
+  </script>
   <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>

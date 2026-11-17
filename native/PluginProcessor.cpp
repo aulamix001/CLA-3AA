@@ -1,4 +1,5 @@
 #include "PluginProcessor.h"
+#include "StartupDiagnostics.h"
 #include "base/source/fstreamer.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
 #include "pluginterfaces/vst/ivstmessage.h"
@@ -17,8 +18,8 @@ bool writeState(IBStream* stream,const Values& values){
     if(!stream)return false;IBStreamer writer(stream,kLittleEndian);if(!writer.writeInt32(1))return false;
     for(double value:values)if(!writer.writeDouble(value))return false;return true;
 }
-Processor::Processor(){setControllerClass(controllerId);for(std::size_t i=0;i<parameterCount;++i)saved[i].store(values[i]);}
-tresult PLUGIN_API Processor::initialize(FUnknown* context){auto result=AudioEffect::initialize(context);if(result!=kResultOk)return result;addAudioInput(STR16("Input"),SpeakerArr::kStereo);addAudioOutput(STR16("Output"),SpeakerArr::kStereo);return kResultOk;}
+Processor::Processor(){StartupScope trace("Processor constructor");setControllerClass(controllerId);for(std::size_t i=0;i<parameterCount;++i)saved[i].store(values[i]);}
+tresult PLUGIN_API Processor::initialize(FUnknown* context){StartupScope trace("Processor initialize");auto result=AudioEffect::initialize(context);if(result!=kResultOk)return result;addAudioInput(STR16("Input"),SpeakerArr::kStereo);addAudioOutput(STR16("Output"),SpeakerArr::kStereo);return kResultOk;}
 tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup){sampleRate=setup.sampleRate;dsp.setValues(values);dsp.prepare(sampleRate);return AudioEffect::setupProcessing(setup);}
 tresult PLUGIN_API Processor::canProcessSampleSize(int32 size){return size==kSample32||size==kSample64?kResultTrue:kResultFalse;}
 tresult PLUGIN_API Processor::setBusArrangements(SpeakerArrangement* inputs,int32 numIns,SpeakerArrangement* outputs,int32 numOuts){

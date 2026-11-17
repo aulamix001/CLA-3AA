@@ -65,3 +65,30 @@ this does not establish a loading-time improvement on any particular DAW.
 Run `node --test tests/*.test.js` for preset and printed-meter calibration tests.
 The native suite additionally sweeps Peak Reduction and checks GR against
 measured attenuation, IN/OUT calibration, Gain, Trim, Mix, bypass and HF contour.
+
+## Startup diagnostics (0.1.2)
+
+This project uses the Steinberg VST3 SDK and WebView2, not JUCE. There is no
+AudioProcessorEditor, BinaryData, APVTS attachment or OpenGLContext to inspect.
+Processor/editor constructors do not load textures, start a browser, wait for
+threads or take application locks. WebView2 starts asynchronously after the
+child HWND is created. Parameter registration now checks all nine IDs.
+
+The release build logs constructor entry/exit, elapsed time, PID/thread ID,
+COM HRESULT, environment/controller calls and callbacks, local-resource checks,
+navigation and HTML/JavaScript startup milestones. Logs use OutputDebugString
+(DebugView/Visual Studio) and `%TEMP%\CLA3AStudio-startup-<PID>.log`.
+No diagnostic calls are placed in the audio processing callback. Log-file
+access happens only during lifecycle/startup diagnostics, never per sample.
+If file writing is denied, debugger output remains available.
+
+Missing module resources, JavaScript errors and rejected promises are reported
+to the native editor. A startup timeout names the last observed stage; it does
+not establish a deadlock or identify the host-side root cause by itself.
+The browser becomes visible after successful navigation, without depending
+solely on the JavaScript handshake. It closes before its parent HWND is destroyed.
+
+The Windows CI opens a real editor window, pumps Windows messages and requires
+the packaged UI to send `ready` within 30 seconds. The runner installs WebView2
+only if needed, verifying the official bootstrapper's Microsoft signature.
+This smoke test does not reproduce every DAW's threading, GPU or security policy.

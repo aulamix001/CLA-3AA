@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(CLA3AStudio VERSION 0.1.1 LANGUAGES CXX)
+project(CLA3AStudio VERSION 0.1.2 LANGUAGES CXX)
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "This release target requires Windows x64. Native DSP tests can also be built directly with g++.")
 endif()
@@ -50,3 +50,16 @@ add_executable(native_dsp_tests tests/native-dsp.test.cpp)
 target_compile_features(native_dsp_tests PRIVATE cxx_std_20)
 enable_testing()
 add_test(NAME native_dsp COMMAND native_dsp_tests)
+
+# Exercise the actual native editor and bundled web UI on the Windows runner.
+add_executable(editor_smoke_tests tests/editor-smoke.test.cpp native/PluginEditor.cpp native/PluginProcessor.cpp)
+target_compile_features(editor_smoke_tests PRIVATE cxx_std_20)
+target_compile_definitions(editor_smoke_tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
+target_include_directories(editor_smoke_tests PRIVATE "${webview2_SOURCE_DIR}/build/native/include")
+target_link_libraries(editor_smoke_tests PRIVATE sdk
+    "${webview2_SOURCE_DIR}/build/native/x64/WebView2LoaderStatic.lib"
+    ole32 oleaut32 user32 gdi32 shlwapi version)
+add_custom_command(TARGET editor_smoke_tests POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_BINARY_DIR}/web" "${CMAKE_BINARY_DIR}/Resources/web")
+add_test(NAME editor_startup COMMAND editor_smoke_tests)
+set_tests_properties(editor_startup PROPERTIES TIMEOUT 45)

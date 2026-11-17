@@ -35,10 +35,22 @@ jobs:
         run: |
           cmake --build build-vst3 --config Release --parallel 2 2>&1 | Tee-Object -FilePath build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-      - name: Run native audio tests
+      - name: Ensure Microsoft WebView2 Runtime for editor smoke test
         shell: pwsh
         run: |
-          ctest --test-dir build-vst3 -C Release --output-on-failure 2>&1 | Tee-Object -FilePath test.log
+          $runtime = Get-ChildItem "${env:ProgramFiles(x86)}/Microsoft/EdgeWebView/Application/*/msedgewebview2.exe" -ErrorAction SilentlyContinue
+          if (-not $runtime) {
+            $installer = Join-Path $env:RUNNER_TEMP 'MicrosoftEdgeWebview2Setup.exe'
+            Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $installer
+            $signature = Get-AuthenticodeSignature $installer
+            if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'O=Microsoft Corporation') { throw 'Invalid Microsoft WebView2 installer signature' }
+            $process = Start-Process $installer -ArgumentList '/silent','/install' -Wait -PassThru
+            if ($process.ExitCode -notin @(0,3010)) { throw "WebView2 installer failed: $($process.ExitCode)" }
+          }
+      - name: Run native audio and real Windows editor tests
+        shell: pwsh
+        run: |
+          ctest --test-dir build-vst3 -C Release --verbose 2>&1 | Tee-Object -FilePath test.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Verify and package Windows binary
         shell: pwsh
@@ -50,7 +62,7 @@ jobs:
       - name: Publish downloadable release
         shell: pwsh
         run: |
-          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v0.1.1' }
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v0.1.2' }
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag CLA-3A-Studio-Windows-x64.zip SHA256SUMS.txt --clobber --repo $env:GITHUB_REPOSITORY

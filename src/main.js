@@ -1,6 +1,7 @@
 import {meterAngle} from './vu-meter.js';
 import { PARAMETERS, STARTUP_SETTINGS, RESET_SETTINGS, KNOB_RANGES, BUILT_IN_PRESETS, RESET_PRESET_INDEX,
   PRESET_SCHEMA_VERSION, applyPreset, normalizeControlValue, loadUserPresets, hfControlOffset } from './cla3a-config.js';
+globalThis.__claStartup?.('main module entered');
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const nativeBridge = globalThis.chrome?.webview;
@@ -138,4 +139,5 @@ nativeBridge?.addEventListener('message',({data})=>{
   }
  }finally{applyingNative=false;}
 });
+globalThis.__claStartup?.('controls and bridge initialized');
 nativeBridge?.postMessage('ready');
