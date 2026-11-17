@@ -92,3 +92,26 @@ The Windows CI opens a real editor window, pumps Windows messages and requires
 the packaged UI to send `ready` within 30 seconds. The runner installs WebView2
 only if needed, verifying the official bootstrapper's Microsoft signature.
 This smoke test does not reproduce every DAW's threading, GPU or security policy.
+
+## Editor compatibility update (0.1.3)
+
+The native editor now opens `Resources/web/native.html` via a local file URL.
+The build embeds its JavaScript, CSS, fonts and textures, so it makes no request
+to `cla3a.local`, loads no separate JavaScript modules and needs no network.
+The normal web build is still available in `index.html`.
+
+Browser creation is queued after host attachment; navigation is queued after
+the WebView2 controller callback returns. The log records both navigation
+entry/return and NavigationStarting, which distinguishes an API call that has
+not returned from an asynchronous load that has not completed.
+
+This release uses WebView2 software rendering and a fresh, versioned browser
+profile per host executable under `%TEMP%/CLA3AStudio-WebView2-0.1.3/`.
+Factory presets, DSP and parameter IDs are unchanged. Browser-saved custom
+presets from the former HTTPS origin are not automatically migrated to the
+new file origin/profile; the old profile is left intact.
+
+The Windows integration test requires **two editors open simultaneously** to
+signal readiness, then closes and reopens one while the other remains open.
+Passing on CI does not establish that the reported Studio Pro 8 stall is fixed
+on the user's machine; `%TEMP%/CLA3AStudio-startup-<PID>.log` remains available.

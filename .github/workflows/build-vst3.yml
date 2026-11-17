@@ -62,7 +62,7 @@ jobs:
       - name: Publish downloadable release
         shell: pwsh
         run: |
-          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v0.1.2' }
+          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { 'v0.1.3' }
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag CLA-3A-Studio-Windows-x64.zip SHA256SUMS.txt --clobber --repo $env:GITHUB_REPOSITORY

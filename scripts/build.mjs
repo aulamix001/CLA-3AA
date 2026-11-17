@@ -1,0 +1,12 @@
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {bundleNativeUi} from './bundle-native-ui.mjs';
+const args=process.argv.slice(2);
+const vite=fileURLToPath(new URL('../node_modules/vite/bin/vite.js',import.meta.url));
+const result=spawnSync(process.execPath,[vite,'build',...args],{stdio:'inherit'});
+if(result.error)throw result.error;
+if(result.status!==0)process.exit(result.status||1);
+const index=args.indexOf('--outDir');
+const directory=index>=0?args[index+1]:args.find(a=>a.startsWith('--outDir='))?.slice(9)||'dist';
+const html=await bundleNativeUi(directory);
+console.log(`Native offline interface: ${Buffer.byteLength(html)} bytes`);

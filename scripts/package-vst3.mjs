@@ -20,7 +20,7 @@ const bytes=await readFile(binary);
 if(bytes[0]!==0x4d||bytes[1]!==0x5a)throw new Error('Missing Windows PE binary');
 const pe=bytes.readUInt32LE(0x3c);
 if(bytes.readUInt16LE(pe+4)!==0x8664)throw new Error('VST3 must be Windows x64');
-if((await stat(path.join(matches[0],'Contents','Resources','web','index.html'))).size<100)throw new Error('Missing approved interface');
+if((await stat(path.join(matches[0],'Contents','Resources','web','native.html'))).size<100)throw new Error('Missing approved interface');
 const output=path.join(build,'package');await mkdir(output,{recursive:true});
 await cp(matches[0],path.join(output,'CLA-3A Studio.vst3'),{recursive:true});
 await copyFile(path.join(root,'INSTALL-VST3.txt'),path.join(output,'INSTALL-VST3.txt'));

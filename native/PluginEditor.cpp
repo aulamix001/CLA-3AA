@@ -4,6 +4,8 @@
 #include <windows.h>
 #include <wrl.h>
 #include <WebView2.h>
+#include <WebView2EnvironmentOptions.h>
+#include <shlwapi.h>
 #include <filesystem>
 #include <sstream>
 #include <locale>
@@ -41,19 +43,22 @@ void Controller::acceptValues(const Values& values){for(std::size_t i=0;i<parame
 void Controller::requestMeters(){if(auto message=owned(allocateMessage())){message->setMessageID("meter");sendMessage(message);}}
 tresult PLUGIN_API Controller::notify(IMessage* message){if(message&&std::strcmp(message->getMessageID(),"meter")==0){const char* names[]={"input","output","reduction"};for(int i=0;i<3;++i){double value=0.;if(message->getAttributes()->getFloat(names[i],value)==kResultOk&&std::isfinite(value))meters[i].store(value,std::memory_order_relaxed);}return kResultOk;}return EditController::notify(message);}
 
-struct EditorState {
+constexpr UINT startBrowserMessage=WM_APP+71;
+constexpr UINT navigateBrowserMessage=WM_APP+72;
+struct EditorState : std::enable_shared_from_this<EditorState> {
     bool active=true,ready=false,comInitialized=false,failed=false;
     HWND window=nullptr;
     Controller* owner=nullptr;
     ComPtr<ICoreWebView2Environment> environment;
     ComPtr<ICoreWebView2Controller> browserController;
     ComPtr<ICoreWebView2> browser;
+    std::wstring navigationUrl;
     ULONGLONG started=GetTickCount64();
     std::string lastStage="editor window";
-    std::wstring status=L"CLA-3A Studio 0.1.2: loading interface...";
+    std::wstring status=L"CLA-3A Studio 0.1.3: loading interface...";
     void stage(const char* name){
         lastStage=name;startupTrace(name);
-        if(!ready&&!failed){status=L"CLA-3A Studio 0.1.2: loading interface...\nStage: "+std::wstring(lastStage.begin(),lastStage.end());if(window)InvalidateRect(window,nullptr,TRUE);}
+        if(!ready&&!failed){status=L"CLA-3A Studio 0.1.3: loading interface...\nStage: "+std::wstring(lastStage.begin(),lastStage.end());if(window)InvalidateRect(window,nullptr,TRUE);}
     }
     void fail(const wchar_t* stage,HRESULT error){
         startupTrace(std::string(stage,stage+wcslen(stage)).c_str(),error);
@@ -88,9 +93,18 @@ struct EditorState {
         owner->acceptValues(values);
     }
 };
+static void startBrowser(const std::shared_ptr<EditorState>& state);
 static LRESULT CALLBACK windowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
     auto state=reinterpret_cast<EditorState*>(GetWindowLongPtrW(window,GWLP_USERDATA));
     if(msg==WM_NCCREATE){auto create=reinterpret_cast<CREATESTRUCTW*>(l);state=static_cast<EditorState*>(create->lpCreateParams);SetWindowLongPtrW(window,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(state));}
+    if(msg==startBrowserMessage&&state&&state->active){startBrowser(state->shared_from_this());return 0;}
+    if(msg==navigateBrowserMessage&&state&&state->active&&state->browser){
+        state->stage("Navigate embedded file interface call");
+        const auto navigation=state->browser->Navigate(state->navigationUrl.c_str());
+        startupTrace("Navigate embedded file interface returned",navigation);
+        if(FAILED(navigation))state->fail(L"Cannot load offline interface",navigation);
+        return 0;
+    }
     if(msg==WM_PAINT&&state){
         PAINTSTRUCT paint;auto dc=BeginPaint(window,&paint);RECT area;GetClientRect(window,&area);
         FillRect(dc,&area,reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
@@ -102,7 +116,7 @@ static LRESULT CALLBACK windowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
         if(w==1)state->frame();
         if(w==2&&!state->ready&&GetTickCount64()-state->started>15000){
             startupTrace(("Timeout waiting for JavaScript ready; last="+state->lastStage).c_str(),HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-            state->status=L"CLA-3A Studio 0.1.2: loading timed out.\nLast stage: "+std::wstring(state->lastStage.begin(),state->lastStage.end())+L"\nStartup log: "+startupLogPath();
+            state->status=L"CLA-3A Studio 0.1.3: loading timed out.\nLast stage: "+std::wstring(state->lastStage.begin(),state->lastStage.end())+L"\nStartup log: "+startupLogPath();
             if(state->browserController)state->browserController->put_IsVisible(FALSE);
             KillTimer(window,2);InvalidateRect(window,nullptr,TRUE);
         }
@@ -116,9 +130,19 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
     StartupScope trace("startBrowser");
     std::weak_ptr<EditorState> weak=state;
     wchar_t temp[MAX_PATH]{};GetTempPathW(MAX_PATH,temp);
-    const auto folder=(std::filesystem::path(temp)/L"CLA3AStudio-WebView2").wstring();
+    // Use a fresh versioned profile, stable per host executable (not per instance).
+    // Two instances share it; unrelated DAWs do not share a running browser profile.
+    wchar_t host[32768]{};GetModuleFileNameW(nullptr,host,32768);
+    const auto hostName=std::filesystem::path(host).stem().wstring();
+    const auto folder=(std::filesystem::path(temp)/L"CLA3AStudio-WebView2-0.1.3"/hostName).wstring();
+    std::error_code profileError;std::filesystem::create_directories(folder,profileError);
+    if(profileError){state->fail(L"Cannot create WebView2 profile",HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED));return;}
+    auto options=Microsoft::WRL::Make<CoreWebView2EnvironmentOptions>();
+    const auto optionsResult=options->put_AdditionalBrowserArguments(L"--disable-gpu");
+    if(FAILED(optionsResult)){state->fail(L"Cannot configure software rendering",optionsResult);return;}
+    startupTrace("Software rendering enabled; per-host profile 0.1.3");
     state->stage("CreateCoreWebView2Environment call");
-    const auto startup=CreateCoreWebView2EnvironmentWithOptions(nullptr,folder.c_str(),nullptr,
+    const auto startup=CreateCoreWebView2EnvironmentWithOptions(nullptr,folder.c_str(),options.Get(),
       Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([weak](HRESULT error,ICoreWebView2Environment* environment)->HRESULT{
         auto s=weak.lock();if(!s||!s->active)return S_OK;
         startupTrace("WebView2 environment callback",error);s->stage("environment callback");
@@ -131,16 +155,17 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
           s->browserController=controller;const auto view=controller->get_CoreWebView2(&s->browser);if(FAILED(view)||!s->browser){s->fail(L"WebView2 interface unavailable",FAILED(view)?view:E_FAIL);return S_OK;}
           ComPtr<ICoreWebView2Controller3> pixels;
           if(SUCCEEDED(s->browserController.As(&pixels))){pixels->put_ShouldDetectMonitorScaleChanges(FALSE);pixels->put_RasterizationScale(1.0);pixels->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);}
-          RECT bounds;GetClientRect(s->window,&bounds);controller->put_Bounds(bounds);controller->put_IsVisible(FALSE);
+          RECT bounds;GetClientRect(s->window,&bounds);controller->put_Bounds(bounds);controller->put_IsVisible(TRUE);
           ComPtr<ICoreWebView2Settings> settings;const auto settingsResult=s->browser->get_Settings(&settings);if(FAILED(settingsResult)||!settings){s->fail(L"WebView2 settings unavailable",FAILED(settingsResult)?settingsResult:E_FAIL);return S_OK;}
           const auto messaging=settings->put_IsWebMessageEnabled(TRUE);if(FAILED(messaging)){s->fail(L"WebView2 messaging unavailable",messaging);return S_OK;}settings->put_AreDevToolsEnabled(FALSE);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_IsZoomControlEnabled(FALSE);
           ComPtr<ICoreWebView2_8> audio;if(SUCCEEDED(s->browser.As(&audio)))audio->put_IsMuted(TRUE);
-          ComPtr<ICoreWebView2_3> resources;if(FAILED(s->browser.As(&resources))){s->fail(L"Update WebView2 Runtime",E_NOINTERFACE);return S_OK;}
-          s->stage("checking Resources/web/index.html");
-          auto directory=webDirectory();std::error_code fileError;
-          if(!std::filesystem::is_regular_file(directory/L"index.html",fileError)){s->fail(L"Missing Resources/web/index.html",HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));return S_OK;}
-          auto folder=directory.wstring();const auto mapping=resources->SetVirtualHostNameToFolderMapping(L"cla3a.local",folder.c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
-          if(FAILED(mapping)){s->fail(L"Local interface mapping failed",mapping);return S_OK;}
+          s->stage("checking self-contained Resources/web/native.html");
+          const auto document=webDirectory()/L"native.html";std::error_code fileError;
+          if(!std::filesystem::is_regular_file(document,fileError)){s->fail(L"Missing Resources/web/native.html",HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));return S_OK;}
+          wchar_t url[65536]{};DWORD urlSize=65536;
+          const auto conversion=UrlCreateFromPathW(document.c_str(),url,&urlSize,0);
+          if(FAILED(conversion)){s->fail(L"Cannot resolve offline interface path",conversion);return S_OK;}
+          s->navigationUrl=url;
           EventRegistrationToken token{};
           const auto handler=s->browser->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([weak](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs* args)->HRESULT{auto s=weak.lock();if(!s||!s->active)return S_OK;LPWSTR text=nullptr;if(SUCCEEDED(args->TryGetWebMessageAsString(&text))&&text){s->message(text);CoTaskMemFree(text);}return S_OK;}).Get(),&token);
           if(FAILED(handler)){s->fail(L"Cannot register JavaScript bridge",handler);return S_OK;}
@@ -153,9 +178,12 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
           s->browser->add_ProcessFailed(Callback<ICoreWebView2ProcessFailedEventHandler>([weak](ICoreWebView2*,ICoreWebView2ProcessFailedEventArgs* args)->HRESULT{
             auto s=weak.lock();if(s&&s->active){COREWEBVIEW2_PROCESS_FAILED_KIND kind{};args->get_ProcessFailedKind(&kind);startupTrace(("WebView2 process failure kind="+std::to_string(static_cast<int>(kind))).c_str(),E_FAIL);s->fail(L"WebView2 process failed; see startup log",E_FAIL);}return S_OK;
           }).Get(),&token);
-          s->stage("Navigate local interface call");
-          const auto navigation=s->browser->Navigate(L"https://cla3a.local/index.html");
-          if(FAILED(navigation)){s->fail(L"Cannot load interface",navigation);return S_OK;}
+          const auto starting=s->browser->add_NavigationStarting(Callback<ICoreWebView2NavigationStartingEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationStartingEventArgs*)->HRESULT{
+            auto s=weak.lock();if(s&&s->active)s->stage("NavigationStarting: offline file");return S_OK;
+          }).Get(),&token);
+          if(FAILED(starting)){s->fail(L"Cannot register navigation diagnostics",starting);return S_OK;}
+          s->stage("offline navigation queued after controller callback");
+          if(!PostMessageW(s->window,navigateBrowserMessage,0,0)){s->fail(L"Cannot queue navigation",HRESULT_FROM_WIN32(GetLastError()));return S_OK;}
           SetTimer(s->window,1,40,nullptr);return S_OK;
         }).Get());startupTrace("CreateCoreWebView2Controller returned",creation);if(FAILED(creation))s->fail(L"Cannot create WebView2 controller",creation);return S_OK;
       }).Get());
@@ -174,7 +202,9 @@ tresult PLUGIN_API Editor::attached(void* parent,FIDString type){
     state->window=CreateWindowExW(0,cls.lpszClassName,L"",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,0,0,640,390,static_cast<HWND>(parent),nullptr,cls.hInstance,state.get());
     if(!state->window){startupTrace("CreateWindowEx failed",HRESULT_FROM_WIN32(GetLastError()));return kResultFalse;}systemWindow=parent;state->stage("HWND attached");
     if(FAILED(result)){state->fail(L"Host UI thread is incompatible with WebView2 COM initialization",result);return kResultTrue;}
-    SetTimer(state->window,2,1000,nullptr);startBrowser(state);return kResultTrue;
+    SetTimer(state->window,2,1000,nullptr);
+    if(!PostMessageW(state->window,startBrowserMessage,0,0))state->fail(L"Cannot queue browser startup",HRESULT_FROM_WIN32(GetLastError()));
+    return kResultTrue;
 }
 tresult PLUGIN_API Editor::removed(){
     StartupScope trace("Editor removed");
