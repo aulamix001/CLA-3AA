@@ -1,3 +1,4 @@
+import {revealNativeInterface} from './native-presentation.js';
 import {meterAngle} from './vu-meter.js';
 import { PARAMETERS, STARTUP_SETTINGS, RESET_SETTINGS, KNOB_RANGES, BUILT_IN_PRESETS, RESET_PRESET_INDEX,
   PRESET_SCHEMA_VERSION, applyPreset, normalizeControlValue, loadUserPresets, hfControlOffset } from './cla3a-config.js';
@@ -5,7 +6,7 @@ globalThis.__claStartup?.('main module entered');
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 const nativeBridge = globalThis.chrome?.webview;
-let nativeReady = false, applyingNative = false;
+let nativeReady = false, applyingNative = false, nativePresentationScheduled = false;
 const defaults = STARTUP_SETTINGS;
 const ranges = KNOB_RANGES;
 let slot='A', slots={A:{...defaults},B:{...defaults}}, state=slots.A, presetIndex=0, presetTitle='Start Me Up', undo=[], redo=[], bypass=false;
@@ -136,6 +137,10 @@ nativeBridge?.addEventListener('message',({data})=>{
   if(Array.isArray(data.meters)&&data.meters.length===3&&data.meters.every(Number.isFinite)){
    const angle=meterAngle(state.vu,data.meters,bypass);
    $('#needle').style.transform=`rotate(${angle}deg)`;
+  }
+  if(!nativePresentationScheduled){
+   nativePresentationScheduled=true;
+   revealNativeInterface(nativeBridge).catch(()=>nativeBridge.postMessage('startup-error:first frame presentation failed'));
   }
  }finally{applyingNative=false;}
 });

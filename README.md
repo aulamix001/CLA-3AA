@@ -115,3 +115,27 @@ The Windows integration test requires **two editors open simultaneously** to
 signal readiness, then closes and reopens one while the other remains open.
 Passing on CI does not establish that the reported Studio Pro 8 stall is fixed
 on the user's machine; `%TEMP%/CLA3AStudio-startup-<PID>.log` remains available.
+
+## Native loading presentation (0.1.4)
+
+A native brushed-gray loading screen is drawn synchronously before WebView2
+startup. It uses GDI and system fonts, with no browser or image dependency.
+An opaque child cover remains above the browser while its initial document
+loads; a transparent WebView background also prevents a blank document flash.
+
+`ready` now starts host-state synchronization without removing the cover.
+After the first host-state update, the page waits for document resources,
+fonts and two animation frames, then posts `painted`. Only that signal reveals
+the interface. Startup logs distinguish JS readiness, resource/font readiness
+and the first rendered-frame handoff. The Windows test checks that the native
+loading cover paints non-black pixels before browser startup, and that it is
+hidden only after painted readiness for both instances and a reopened editor.
+
+The compatible 0.1.3 browser profile is retained, preserving custom presets
+saved there. The loading screen improves the transition, not the underlying
+WebView2 cold-start duration. CPU use and DAW-specific timing need separate
+measurement; the cover is not a claim that Studio Pro 8 has been validated.
+
+The native UI payload also removes a superseded metal-background reference and
+shares the logo mask through a CSS variable, avoiding repeated base64 SVG data.
+The texture shapes, DSP and all 44 built-in presets remain unchanged.
