@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(CLA3AStudio VERSION 0.1.4 LANGUAGES CXX)
+project(CLA3AStudio VERSION 0.1.5 LANGUAGES CXX)
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "This release target requires Windows x64. Native DSP tests can also be built directly with g++.")
 endif()
@@ -35,7 +35,7 @@ smtg_add_vst3plugin(CLA3AStudio PACKAGE_NAME "CLA-3A Studio" SOURCES_LIST
 )
 target_link_libraries(CLA3AStudio PRIVATE sdk
     "${webview2_SOURCE_DIR}/build/native/x64/WebView2LoaderStatic.lib"
-    ole32 oleaut32 user32 gdi32 shlwapi version)
+    ole32 oleaut32 user32 gdi32 comctl32 shlwapi version)
 target_include_directories(CLA3AStudio PRIVATE "${webview2_SOURCE_DIR}/build/native/include")
 target_compile_definitions(CLA3AStudio PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN UNICODE _UNICODE)
 smtg_target_set_bundle(CLA3AStudio BUNDLE_IDENTIFIER "com.aulamix.cla3astudio" COMPANY_NAME "Aulamix")
@@ -58,7 +58,7 @@ target_compile_definitions(editor_smoke_tests PRIVATE NOMINMAX WIN32_LEAN_AND_ME
 target_include_directories(editor_smoke_tests PRIVATE "${webview2_SOURCE_DIR}/build/native/include")
 target_link_libraries(editor_smoke_tests PRIVATE sdk
     "${webview2_SOURCE_DIR}/build/native/x64/WebView2LoaderStatic.lib"
-    ole32 oleaut32 user32 gdi32 shlwapi version)
+    ole32 oleaut32 user32 gdi32 comctl32 shlwapi version)
 add_custom_command(TARGET editor_smoke_tests POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy_directory "${CMAKE_BINARY_DIR}/web" "${CMAKE_BINARY_DIR}/Resources/web")
 add_test(NAME editor_startup COMMAND editor_smoke_tests)
@@ -68,3 +68,6 @@ if(MSVC)
     target_compile_options(CLA3AStudio PRIVATE /utf-8)
     target_compile_options(editor_smoke_tests PRIVATE /utf-8)
 endif()
+
+add_test(NAME editor_missing_html_fallback COMMAND editor_smoke_tests --missing-ui)
+set_tests_properties(editor_missing_html_fallback PROPERTIES TIMEOUT 45 RUN_SERIAL TRUE)

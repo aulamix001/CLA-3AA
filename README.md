@@ -139,3 +139,22 @@ measurement; the cover is not a claim that Studio Pro 8 has been validated.
 The native UI payload also removes a superseded metal-background reference and
 shares the logo mask through a CSS variable, avoiding repeated base64 SVG data.
 The texture shapes, DSP and all 44 built-in presets remain unchanged.
+
+## Native controls fallback and console diagnostics (0.1.5)
+
+The loading screen offers **Usar controles nativos**. Startup failures and a
+15-second presentation timeout automatically open this panel. It provides all
+nine native parameters (five sliders, VU selector, mode, analog and bypass) and
+numeric metering with host automation. The graphical editor and its preset
+browser remain available through **Voltar à interface gráfica** once loaded.
+The fallback panel is a basic control surface; it has no preset browser.
+
+Both console.error/console.warn and script/resource errors are written to
+`%TEMP%/CLA3AStudio-startup-<PID>.log` and debugger output. Startup diagnostics
+also record runtime discovery and the absolute native.html path. The loader is
+statically linked; the separate Evergreen runtime remains required for the web
+editor. Native controls do not depend on WebView2 loading successfully.
+
+CI tests native parameter editing and deliberately removes the generated HTML,
+verifying that the missing-resource failure automatically opens working native
+controls. The fixture is restored before packaging the release.

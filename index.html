@@ -8,6 +8,10 @@
     const bridge=globalThis.chrome?.webview;
     if(!bridge)return;
     const report=message=>{try{bridge.postMessage(message);}catch{}};
+    for(const level of ['error','warn']){
+      const original=console[level].bind(console);
+      console[level]=(...args)=>{report('console-'+level+':'+args.map(value=>String(value)).join(' ').slice(0,240));original(...args);};
+    }
     globalThis.__claStartup=stage=>report('diagnostic:'+stage);
     addEventListener('error',event=>{
       if(event.target!==globalThis){

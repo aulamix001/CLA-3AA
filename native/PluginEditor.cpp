@@ -6,6 +6,7 @@
 #include <WebView2.h>
 #include <WebView2EnvironmentOptions.h>
 #include <shlwapi.h>
+#include <commctrl.h>
 #include <filesystem>
 #include <sstream>
 #include <locale>
@@ -46,6 +47,12 @@ tresult PLUGIN_API Controller::notify(IMessage* message){if(message&&std::strcmp
 constexpr UINT startBrowserMessage=WM_APP+71;
 constexpr UINT navigateBrowserMessage=WM_APP+72;
 struct EditorState : std::enable_shared_from_this<EditorState> {
+    bool fallback=false;
+    std::array<HWND,9> fallbackControls{};
+    HWND fallbackButton=nullptr,fallbackMeters=nullptr;
+    void enableFallback();
+    void syncFallback();
+    void changeFallback(int id);
     bool active=true,ready=false,painted=false,comInitialized=false,failed=false,timedOut=false;
     HWND window=nullptr,cover=nullptr;
     Controller* owner=nullptr;
@@ -55,10 +62,10 @@ struct EditorState : std::enable_shared_from_this<EditorState> {
     std::wstring navigationUrl;
     ULONGLONG started=GetTickCount64();
     std::string lastStage="editor window";
-    std::wstring status=L"CLA-3A Studio 0.1.4: loading interface...";
+    std::wstring status=L"CLA-3A Studio 0.1.5: loading interface...";
     void stage(const char* name){
         lastStage=name;startupTrace(name);
-        if(!ready&&!failed){status=L"CLA-3A Studio 0.1.4: loading interface...\nStage: "+std::wstring(lastStage.begin(),lastStage.end());if(window)InvalidateRect(window,nullptr,TRUE);}
+        if(!ready&&!failed){status=L"CLA-3A Studio 0.1.5: loading interface...\nStage: "+std::wstring(lastStage.begin(),lastStage.end());if(window)InvalidateRect(window,nullptr,TRUE);}
     }
     void fail(const wchar_t* stage,HRESULT error){
         startupTrace(std::string(stage,stage+wcslen(stage)).c_str(),error);
@@ -66,7 +73,7 @@ struct EditorState : std::enable_shared_from_this<EditorState> {
             <<L"Check the WebView2 Runtime and the complete VST3 Resources folder.\nStartup log: "<<startupLogPath();
         ready=false;painted=false;failed=true;status=text.str();if(cover){ShowWindow(cover,SW_SHOW);SetWindowPos(cover,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);InvalidateRect(cover,nullptr,FALSE);}if(browserController)browserController->put_IsVisible(FALSE);
         if(window){KillTimer(window,2);InvalidateRect(window,nullptr,TRUE);}
-        OutputDebugStringW(status.c_str());
+        OutputDebugStringW(status.c_str());enableFallback();
     }
     void frame(){
         if(!active||!ready||!browser||!owner)return;
@@ -83,9 +90,13 @@ struct EditorState : std::enable_shared_from_this<EditorState> {
         if(input==L"ready"){stage("JavaScript ready received");failed=false;ready=true;if(browserController)browserController->put_IsVisible(TRUE);frame();return;}
         if(input==L"painted"&&ready&&!failed){
             stage("First painted frame revealed");painted=true;timedOut=false;
-            KillTimer(window,2);KillTimer(window,3);
-            if(cover)ShowWindow(cover,SW_HIDE);
+            KillTimer(window,2);if(!fallback)KillTimer(window,3);
+            if(cover&&!fallback)ShowWindow(cover,SW_HIDE);
+            if(fallbackButton&&fallback)SetWindowTextW(fallbackButton,L"Voltar à interface gráfica");
             return;
+        }
+        if(input.rfind(L"console-error:",0)==0||input.rfind(L"console-warn:",0)==0){
+            const auto bounded=input.substr(0,260);startupTrace(std::string(bounded.begin(),bounded.end()).c_str());return;
         }
         if(input.rfind(L"diagnostic:",0)==0){
             const auto detail=input.substr(11,240);const std::string ascii(detail.begin(),detail.end());stage(ascii.c_str());return;
@@ -99,6 +110,51 @@ struct EditorState : std::enable_shared_from_this<EditorState> {
         owner->acceptValues(values);
     }
 };
+void EditorState::enableFallback(){
+    if(!cover||!owner)return;
+    fallback=true;startupTrace("Native parameter fallback enabled");ShowWindow(cover,SW_SHOW);
+    SetWindowPos(cover,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);
+    SetWindowTextW(fallbackButton,painted?L"Voltar à interface gráfica":L"Controles nativos ativos");
+    MoveWindow(fallbackButton,355,298,255,27,TRUE);
+    if(!fallbackControls[0]){
+        INITCOMMONCONTROLSEX common{sizeof(common),ICC_BAR_CLASSES};InitCommonControlsEx(&common);
+        const wchar_t* names[]={L"GAIN",L"PEAK REDUCTION",L"HI FREQ",L"MIX",L"TRIM"};
+        for(int i=0;i<5;++i){
+            auto label=CreateWindowExW(0,L"STATIC",names[i],WS_CHILD|WS_VISIBLE,24,80+i*36,150,24,cover,nullptr,nullptr,nullptr);
+            SendMessageW(label,WM_SETFONT,reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)),TRUE);
+            fallbackControls[i]=CreateWindowExW(0,TRACKBAR_CLASSW,L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|TBS_HORZ|TBS_NOTICKS,180,76+i*36,425,30,cover,reinterpret_cast<HMENU>(8100+i),nullptr,nullptr);
+            SendMessageW(fallbackControls[i],TBM_SETRANGE,TRUE,MAKELPARAM(0,i==Trim?360:1000));
+        }
+        const wchar_t* choices[3][3]={{L"VU: IN",L"VU: GR",L"VU: OUT"},{L"COMP",L"LIMITER",nullptr},{L"ANALOG: 50 Hz",L"ANALOG: 60 Hz",L"ANALOG: OFF"}};
+        for(int i=5;i<8;++i){
+            fallbackControls[i]=CreateWindowExW(0,L"COMBOBOX",L"",WS_CHILD|WS_VISIBLE|WS_TABSTOP|CBS_DROPDOWNLIST,24+(i-5)*194,264,180,150,cover,reinterpret_cast<HMENU>(8100+i),nullptr,nullptr);
+            for(int n=0;n<3&&choices[i-5][n];++n)SendMessageW(fallbackControls[i],CB_ADDSTRING,0,reinterpret_cast<LPARAM>(choices[i-5][n]));
+        }
+        fallbackControls[Bypass]=CreateWindowExW(0,L"BUTTON",L"Bypass",WS_CHILD|WS_VISIBLE|WS_TABSTOP|BS_AUTOCHECKBOX,24,302,110,24,cover,reinterpret_cast<HMENU>(8100+Bypass),nullptr,nullptr);
+        fallbackMeters=CreateWindowExW(0,L"STATIC",L"",WS_CHILD|WS_VISIBLE,145,300,205,35,cover,nullptr,nullptr,nullptr);
+        for(auto control:fallbackControls)SendMessageW(control,WM_SETFONT,reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)),TRUE);
+        SendMessageW(fallbackMeters,WM_SETFONT,reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)),TRUE);
+    }
+    SetTimer(window,3,250,nullptr);syncFallback();InvalidateRect(cover,nullptr,FALSE);
+}
+void EditorState::syncFallback(){
+    if(!fallback||!owner||!fallbackControls[0])return;
+    const auto values=owner->currentValues();
+    for(int i=0;i<5;++i)SendMessageW(fallbackControls[i],TBM_SETPOS,TRUE,static_cast<LPARAM>(std::lround(normalize(i,values[i])*(i==Trim?360:1000))));
+    for(int i=5;i<8;++i)SendMessageW(fallbackControls[i],CB_SETCURSEL,static_cast<WPARAM>(values[i]),0);
+    SendMessageW(fallbackControls[Bypass],BM_SETCHECK,values[Bypass]>=.5?BST_CHECKED:BST_UNCHECKED,0);
+    owner->requestMeters();std::wostringstream meter;meter.precision(1);meter<<std::fixed;
+    const auto mode=static_cast<int>(values[Meter]);meter<<(mode==0?L"IN: ":mode==1?L"GR: ":L"OUT: ")<<owner->meters[mode==0?0:mode==1?2:1].load()<<L" dB";
+    SetWindowTextW(fallbackMeters,meter.str().c_str());
+}
+void EditorState::changeFallback(int id){
+    if(!owner||id<8100||id>=8100+static_cast<int>(parameterCount))return;
+    const int i=id-8100;auto values=owner->currentValues();
+    if(i<5)values[i]=denormalize(i,static_cast<double>(SendMessageW(fallbackControls[i],TBM_GETPOS,0,0))/(i==Trim?360.:1000.));
+    else if(i<8){const auto selection=SendMessageW(fallbackControls[i],CB_GETCURSEL,0,0);if(selection==CB_ERR)return;values[i]=static_cast<double>(selection);}
+    else values[i]=SendMessageW(fallbackControls[i],BM_GETCHECK,0,0)==BST_CHECKED?1.:0.;
+    owner->acceptValues(values);syncFallback();
+}
 static void drawLoadingScreen(HWND window,HDC target,EditorState* state){
     RECT bounds;GetClientRect(window,&bounds);const int width=bounds.right,height=bounds.bottom;
     if(width<=0||height<=0)return;
@@ -113,11 +169,13 @@ static void drawLoadingScreen(HWND window,HDC target,EditorState* state){
     auto title=CreateFontW(-30,0,0,0,FW_BOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
     auto body=CreateFontW(-14,0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
     auto oldFont=SelectObject(dc,title);SetTextColor(dc,RGB(217,216,207));
-    RECT text{20,height/2-65,width-20,height/2-20};DrawTextW(dc,L"CLA-3A STUDIO",-1,&text,DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
+    RECT text{20,state->fallback?8:height/2-65,width-20,state->fallback?48:height/2-20};DrawTextW(dc,L"CLA-3A STUDIO",-1,&text,DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
     SelectObject(dc,body);SetTextColor(dc,RGB(175,173,157));
-    text={24,height/2-10,width-24,height/2+24};
-    DrawTextW(dc,state->failed?L"Falha ao abrir a interface":state->timedOut?L"A interface está demorando mais que o esperado":L"Preparando a interface...",-1,&text,DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
-    if(state->failed||state->timedOut){
+    text={24,state->fallback?45:height/2-10,width-24,state->fallback?72:height/2+24};
+    DrawTextW(dc,state->fallback?L"Controles nativos — áudio e automação ativos":state->failed?L"Falha ao abrir a interface":state->timedOut?L"A interface está demorando mais que o esperado":L"Preparando a interface...",-1,&text,DT_CENTER|DT_SINGLELINE|DT_VCENTER|DT_NOPREFIX);
+    if(state->fallback){
+        text={24,height-50,width-24,height-12};DrawTextW(dc,L"Logs: %TEMP%\\CLA3AStudio-startup-<PID>.log",-1,&text,DT_LEFT|DT_WORDBREAK|DT_NOPREFIX);
+    }else if(state->failed||state->timedOut){
         text={24,height/2+36,width-24,height-14};DrawTextW(dc,state->status.c_str(),-1,&text,DT_LEFT|DT_WORDBREAK|DT_NOPREFIX);
     }else{
         const int left=width/2-110,top=height/2+42;
@@ -131,6 +189,16 @@ static void drawLoadingScreen(HWND window,HDC target,EditorState* state){
 static LRESULT CALLBACK loadingWindowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
     auto state=reinterpret_cast<EditorState*>(GetWindowLongPtrW(window,GWLP_USERDATA));
     if(msg==WM_NCCREATE){auto create=reinterpret_cast<CREATESTRUCTW*>(l);state=static_cast<EditorState*>(create->lpCreateParams);SetWindowLongPtrW(window,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(state));}
+    if(msg==WM_COMMAND&&state){
+        const int id=LOWORD(w);
+        if(id==8001){
+            if(state->fallback&&state->painted){state->fallback=false;ShowWindow(state->cover,SW_HIDE);KillTimer(state->window,3);}
+            else state->enableFallback();
+        }else if(state->fallback)state->changeFallback(id);
+        return 0;
+    }
+    if(msg==WM_HSCROLL&&state&&state->fallback){state->changeFallback(GetDlgCtrlID(reinterpret_cast<HWND>(l)));return 0;}
+    if(msg==WM_CTLCOLORSTATIC){SetTextColor(reinterpret_cast<HDC>(w),RGB(225,225,215));SetBkMode(reinterpret_cast<HDC>(w),TRANSPARENT);return reinterpret_cast<LRESULT>(GetStockObject(NULL_BRUSH));}
     if(msg==WM_ERASEBKGND)return 1;
     if(msg==WM_PRINTCLIENT&&state){drawLoadingScreen(window,reinterpret_cast<HDC>(w),state);return 0;}
     if(msg==WM_PAINT&&state){PAINTSTRUCT paint;auto dc=BeginPaint(window,&paint);drawLoadingScreen(window,dc,state);EndPaint(window,&paint);return 0;}
@@ -154,11 +222,12 @@ static LRESULT CALLBACK windowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
     if(msg==WM_ERASEBKGND)return 1;
     if(msg==WM_TIMER&&state){
         if(w==1)state->frame();
-        if(w==3&&!state->painted&&state->cover){SetWindowPos(state->cover,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);InvalidateRect(state->cover,nullptr,FALSE);}
+        if(w==3&&state->fallback)state->syncFallback();
+        if(w==3&&(!state->painted||state->fallback)&&state->cover){SetWindowPos(state->cover,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);InvalidateRect(state->cover,nullptr,FALSE);}
         if(w==2&&!state->painted&&GetTickCount64()-state->started>15000){
             startupTrace(("Timeout waiting for first painted frame; last="+state->lastStage).c_str(),HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-            state->status=L"CLA-3A Studio 0.1.4: loading timed out.\nLast stage: "+std::wstring(state->lastStage.begin(),state->lastStage.end())+L"\nStartup log: "+startupLogPath();
-            state->timedOut=true;
+            state->status=L"CLA-3A Studio 0.1.5: loading timed out.\nLast stage: "+std::wstring(state->lastStage.begin(),state->lastStage.end())+L"\nStartup log: "+startupLogPath();
+            state->timedOut=true;state->enableFallback();
             KillTimer(window,2);if(state->cover)InvalidateRect(state->cover,nullptr,FALSE);InvalidateRect(window,nullptr,TRUE);
         }
         return 0;
@@ -182,6 +251,8 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
     const auto optionsResult=options->put_AdditionalBrowserArguments(L"--disable-gpu");
     if(FAILED(optionsResult)){state->fail(L"Cannot configure software rendering",optionsResult);return;}
     startupTrace("Software rendering enabled; per-host profile 0.1.3");
+    LPWSTR installedVersion=nullptr;const auto runtime=GetAvailableCoreWebView2BrowserVersionString(nullptr,&installedVersion);
+    startupTrace("WebView2 runtime discovery",runtime);if(installedVersion)CoTaskMemFree(installedVersion);
     state->stage("CreateCoreWebView2Environment call");
     const auto startup=CreateCoreWebView2EnvironmentWithOptions(nullptr,folder.c_str(),options.Get(),
       Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([weak](HRESULT error,ICoreWebView2Environment* environment)->HRESULT{
@@ -206,6 +277,7 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
           ComPtr<ICoreWebView2_8> audio;if(SUCCEEDED(s->browser.As(&audio)))audio->put_IsMuted(TRUE);
           s->stage("checking self-contained Resources/web/native.html");
           const auto document=webDirectory()/L"native.html";std::error_code fileError;
+          const auto resolved=document.wstring();startupTrace(("Resolved native HTML: "+std::string(resolved.begin(),resolved.end())).c_str());
           if(!std::filesystem::is_regular_file(document,fileError)){s->fail(L"Missing Resources/web/native.html",HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));return S_OK;}
           wchar_t url[65536]{};DWORD urlSize=65536;
           const auto conversion=UrlCreateFromPathW(document.c_str(),url,&urlSize,0);
@@ -249,6 +321,8 @@ tresult PLUGIN_API Editor::attached(void* parent,FIDString type){
     WNDCLASSW loading{};loading.lpfnWndProc=loadingWindowProc;loading.hInstance=cls.hInstance;loading.hCursor=cls.hCursor;loading.lpszClassName=L"CLA3AStudioLoading";RegisterClassW(&loading);
     state->cover=CreateWindowExW(0,loading.lpszClassName,L"",WS_CHILD|WS_VISIBLE|WS_CLIPSIBLINGS,0,0,640,390,state->window,nullptr,cls.hInstance,state.get());
     if(!state->cover){state->fail(L"Cannot create native loading screen",HRESULT_FROM_WIN32(GetLastError()));return kResultTrue;}
+    state->fallbackButton=CreateWindowExW(0,L"BUTTON",L"Usar controles nativos",WS_CHILD|WS_VISIBLE|WS_TABSTOP,200,335,240,28,state->cover,reinterpret_cast<HMENU>(8001),cls.hInstance,nullptr);
+    SendMessageW(state->fallbackButton,WM_SETFONT,reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)),TRUE);
     UpdateWindow(state->window);UpdateWindow(state->cover);startupTrace("Native loading screen painted before browser startup");
     SetTimer(state->window,3,80,nullptr);
     if(FAILED(result)){state->fail(L"Host UI thread is incompatible with WebView2 COM initialization",result);return kResultTrue;}

@@ -33,3 +33,10 @@ test('normal browser use requires no WebView2 bridge',()=>{
  const {messages,handlers}=boot(false);
  assert.deepEqual(messages,[]);assert.deepEqual(handlers,{});
 });
+
+test('console errors and warnings reach native diagnostics without disabling console output',()=>{
+ const {sandbox,messages}=boot();
+ runInNewContext('console.error("missing main.js");console.warn("slow renderer")',sandbox);
+ assert.ok(messages.includes('console-error:missing main.js'));
+ assert.ok(messages.includes('console-warn:slow renderer'));
+});
