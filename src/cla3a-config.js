@@ -525,6 +525,39 @@ export const STARTUP_SETTINGS = Object.freeze(applyPreset(INITIAL_SETTINGS, FACT
 
 // Thirty original starting points for this recreation, separate from the 14 XML presets.
 // Every entry explicitly assigns all existing controls. These are not Waves factory presets.
+const PRESET_DESCRIPTIONS = Object.freeze([
+  "Voz suave · comece com 2–3 dB de redução; preserve a dinâmica.",
+  "Voz presente · 3–5 dB de redução para estabilizar frases.",
+  "Voz nivelada · 4–6 dB de redução em passagens fortes.",
+  "Voz íntima · compressão moderada com parte do sinal seco.",
+  "Voz rock · 5–7 dB de redução; confira consoantes e respirações.",
+  "Voz paralela · compressão forte misturada ao sinal seco.",
+  "Baixo elétrico · 3–5 dB de redução para firmar as notas.",
+  "Baixo sustentado · 5–7 dB de redução nas notas longas.",
+  "Baixo com palheta · controle o ataque sem perder articulação.",
+  "Baixo subgrave · nivelamento leve; confira a sustentação.",
+  "Bumbo · controle o corpo; preserve o impacto inicial.",
+  "Caixa · densidade com mistura seca para conservar transientes.",
+  "Bus de bateria · 1–3 dB de redução; evite bombeamento.",
+  "Bateria paralela · LIMITER forte com apenas 30% de sinal processado.",
+  "Microfones de sala · compressão intensa para trazer ambiente.",
+  "Violão · 2–4 dB de redução para equilibrar acordes.",
+  "Violão com palheta · controle de ataques mais brilhantes.",
+  "Guitarra elétrica · 2–4 dB de redução para coesão.",
+  "Guitarra solo · sustentação; ajuste a saída ao volume do bypass.",
+  "Bus de guitarras · LIMITER com mistura seca para domar picos.",
+  "Piano · nivelamento moderado; confira os ataques fortes.",
+  "Piano percussivo · LIMITER paralelo para conter transientes.",
+  "Rhodes · compressão suave para acordes mais uniformes.",
+  "Pads · 1–3 dB de redução para movimento suave.",
+  "Synth pluck · controle de picos com ataque seco preservado.",
+  "Cordas · nivelamento discreto de frases em legato.",
+  "Metais · LIMITER para conter acentos mais fortes.",
+  "Mix bus · uso sutil: 1–2 dB de redução; compare em volume igual.",
+  "Textura vintage · hum de 50 Hz intencional; desligue ANALOG para silêncio.",
+  "Textura vintage · hum de 60 Hz intencional; desligue ANALOG para silêncio."
+]);
+
 export const GENERATED_PRESETS = Object.freeze([
   ['Vocal Silk',4.65,3.2,100,100,-0.3,'COMP','OFF','GR'],
   ['Vocal Presence',5.1,4.6,65,100,-0.8,'COMP','OFF','GR'],
@@ -556,8 +589,8 @@ export const GENERATED_PRESETS = Object.freeze([
   ['Mix Bus Kiss',4.25,1.85,100,75,-0.2,'COMP','OFF','OUT'],
   ['Vintage 50Hz Glue',4.8,3.8,90,90,-0.6,'COMP','50Hz','GR'],
   ['Vintage 60Hz Punch',5.15,5.2,80,85,-1,'COMP','60Hz','GR'],
-].map(([name,gain,peak,hifreq,mix,trim,mode,analog,vu]) => Object.freeze({
-  name, type:'Generated', settings:Object.freeze({gain,peak,hifreq,mix,trim,mode,analog,vu}),
+].map(([name,gain,peak,hifreq,mix,trim,mode,analog,vu], index) => Object.freeze({
+  name, type:'Generated', description:PRESET_DESCRIPTIONS[index], settings:Object.freeze({gain,peak,hifreq,mix,trim,mode,analog,vu}),
 })));
 
 export const BUILT_IN_PRESETS = Object.freeze([...FACTORY_PRESETS, ...GENERATED_PRESETS]);

@@ -56,7 +56,7 @@ meterMarks.forEach(([value,tx,ty,x1,y1,x2,y2],i)=>{
  const t=svgElement('text',{x:tx,y:ty,'text-anchor':'middle',fill:color,'font-size':19,'font-family':'Arial'});t.textContent=value;$('#meter-scale').append(t);
 });
 const stage=$('.plugin-stage');
-function scaleInterface(){ $('.plugin').style.transform=`scale(${Math.min(1,stage.clientWidth/640)})`; }
+function scaleInterface(){ $('.plugin').style.transform=`scale(${stage.clientWidth/640})`; }
 new ResizeObserver(scaleInterface).observe(stage);scaleInterface();
 function render(){
  $$('[data-control]').forEach(el=>{const key=el.dataset.control;const [min,max]=ranges[key];el.style.setProperty('--rotation',`${key==='hifreq'?hfControlOffset(state[key])*1.35:-150+(state[key]-min)/(max-min)*300+(key==='gain'?14:0)}deg`);el.setAttribute('aria-valuenow',state[key]);el.setAttribute('aria-valuetext',`${state[key]}${key==='mix'?' percent':key==='trim'?' dB':''}`);el.title=`${el.getAttribute('aria-label')}: ${state[key]} · Drag to adjust`;el.querySelectorAll('[data-number]').forEach(t=>t.classList.toggle('active',Number(t.dataset.number)===Math.round(state[key])));});
@@ -69,7 +69,7 @@ function render(){
  $('#setup').textContent=`Setup ${slot}`;$('#copy').textContent=slot==='A'?'A→B':'B→A';$('#preset-name').textContent=`${slot}: ${presetTitle}`;historyUI();updateAudio();postNativeState();
 }
 function setPreset(index){record();presetIndex=(index+presets.length)%presets.length;state=slots[slot]=applyPreset(state,presets[presetIndex]);presetTitle=presets[presetIndex].name;render();closeMenus();}
-function renderPresets(){const menu=$('#preset-menu');menu.innerHTML='';presets.forEach((p,i)=>{const btn=document.createElement('button');btn.textContent=p.name;btn.setAttribute('role','option');btn.setAttribute('aria-selected',presetIndex===i);btn.classList.toggle('active',presetIndex===i);if(i===presetIndex){const mark=document.createElement('span');mark.textContent='✓';btn.append(mark);}btn.onclick=()=>setPreset(i);menu.append(btn);});}
+function renderPresets(){const menu=$('#preset-menu');menu.innerHTML='';presets.forEach((p,i)=>{const btn=document.createElement('button');btn.textContent=p.name;btn.setAttribute('role','option');btn.setAttribute('aria-selected',presetIndex===i);btn.classList.toggle('active',presetIndex===i);if(i===presetIndex){const mark=document.createElement('span');mark.textContent='✓';btn.append(mark);}if(p.description){const hint=document.createElement('small');hint.textContent=p.description;btn.append(hint);btn.title=p.description;}btn.onclick=()=>setPreset(i);menu.append(btn);});}
 function closeMenus(){$('#preset-menu').hidden=true;$('#settings-menu').hidden=true;$('#preset-btn').setAttribute('aria-expanded','false');$('#menu-btn').setAttribute('aria-expanded','false');}
 $('#preset-btn').onclick=e=>{e.stopPropagation();const open=$('#preset-menu').hidden;closeMenus();renderPresets();$('#preset-menu').hidden=!open;$('#preset-btn').setAttribute('aria-expanded',open);};
 $('#menu-btn').onclick=e=>{e.stopPropagation();const open=$('#settings-menu').hidden;closeMenus();$('#settings-menu').hidden=!open;$('#menu-btn').setAttribute('aria-expanded',open);};

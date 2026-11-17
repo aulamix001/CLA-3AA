@@ -43,3 +43,27 @@ dialog{width:600px;max-width:calc(100vw - 32px);max-height:calc(100svh - 32px);p
 .analog-options button.active{background:linear-gradient(#fffde3,#e8e4bc);box-shadow:inset 1px 1px #fffff0,inset 0 -1px #aba880,0 1px 3px #000b,0 0 3px #fff2bc22}
 .small-knob .knob-pointer{filter:none;inset:0}.small-knob .knob-pointer:before{left:calc(50% - 4px);top:1px;bottom:1px;width:8px;height:auto;background:linear-gradient(90deg,#15210b,#596f3b 50%,#101b06);border-radius:2px;box-shadow:1px 1px 1px #000a}.small-knob .knob-pointer:after{display:block}
 .hi-control .small-knob .knob-pointer:before{display:none}
+
+/* Reference finish: horizontally brushed graphite, polished Bakelite and chrome. */
+body{background:#151515}
+.plugin-stage{width:min(930px,calc(100vw - 12px));height:auto;aspect-ratio:640/390}
+.plugin{padding:2px 2px 2px 1px;background:#191919;box-shadow:0 0 0 1px #050505,0 18px 45px #0007}
+.faceplate{background:radial-gradient(ellipse at 48% 0%,#ffffff0b,transparent 70%),url('/textures/brushed-graphite.svg') center/100% 100%;border-top-color:#68696a;box-shadow:inset 0 1px 1px #c5c6c65c,inset 0 -2px 3px #000,inset 0 -30px 55px #0003}
+.faceplate:before{opacity:.08}.faceplate:after{background:linear-gradient(180deg,#ffffff03,transparent 30%,#0002)}
+.bottom-panel{background:linear-gradient(100deg,#ffffff12,#ffffff07),url('/textures/brushed-graphite.svg') center/100% 100%;border-top-color:#777;box-shadow:inset 0 1px #b5b5b566,inset 0 -1px #000}
+.bottom-panel:before{opacity:.1}
+.knob{background:conic-gradient(from 5deg,#626262,#292929 15%,#111 32%,#080808 48%,#1a1a1a 62%,#505050 76%,#9a9a9a 84%,#606060 94%,#626262);border-color:#111;box-shadow:3px 7px 7px #000b,1px 2px 2px #000,0 -1px 1px #bdbdbd66,inset 0 0 0 1px #74747455}
+.knob:before{background:radial-gradient(ellipse at 24% 22%,#eee9,transparent 17%),radial-gradient(ellipse at 27% 29%,#777 0%,#3b3b3b 18%,#141414 44%,#070707 73%);box-shadow:inset 0 2px 3px #000b,0 0 0 2px #121212,0 1px 1px #aaa4}
+.knob:after{background:radial-gradient(ellipse at 25% 18%,#fff3,transparent 32%);box-shadow:inset 2px 1px 2px #fff2,inset -1px -2px 1px #000a}
+.knob-pointer{filter:grayscale(1) drop-shadow(2px 2px 1px #0009)}
+.toggle-nut,.toggle-lever{filter:grayscale(1) drop-shadow(1px 2px 1px #000a)}
+.meter-case{border-color:#292929 #131313 #44443e #252525;background:linear-gradient(135deg,#55544d,#191a17 24%,#080908 65%,#505049);box-shadow:3px 4px 3px #000b,-2px -2px 2px #ffffff0e,inset 1px 1px 1px #a6a18b44}
+.meter-glass{background:#c5b577;box-shadow:inset 0 2px 5px #43321a,inset 0 7px 9px #ffdf8b77}
+.glass-shine{background:linear-gradient(180deg,#fff6bd55 0%,#ffedaa22 6%,transparent 13%,transparent 94%,#2b211d44),linear-gradient(90deg,#ffffe54d,transparent 4%,transparent 97%,#15110966);box-shadow:inset 3px 2px 4px #3d2b1a88,inset -1px 0 2px #151109aa}
+.meter-base{background:linear-gradient(#292b2c,#242628);border-bottom-color:#080808}
+.model-logo{color:#c2c2bf;letter-spacing:1px;text-shadow:0 1px #111}
+.small-knob{filter:grayscale(1)}
+.preset-menu{max-height:276px;overflow-y:auto;overscroll-behavior:contain;width:310px;scrollbar-color:#777 #222}
+.preset-menu button{display:block;padding:8px 10px;border-bottom:1px solid #ffffff09}
+.preset-menu button span{float:right}.preset-menu small{display:block;clear:both;font-size:9px;line-height:1.5;color:#aaa;margin-top:3px}
+@media(max-width:640px){body{padding:0}.plugin-stage{width:calc(100vw - 12px);height:auto}}
