@@ -1,4 +1,4 @@
-CLA-3A Studio — Windows x64 VST3, version 0.1.5
+CLA-3A Studio — Windows x64 VST3, version 0.1.6
 
 1. Extract the ZIP.
 2. Copy the entire "CLA-3A Studio.vst3" folder to:
@@ -25,3 +25,9 @@ The binary is unsigned. Compilation and the Steinberg VST3 validator are checked
 by CI; compatibility with every DAW and Windows display configuration is not
 claimed. Source and build workflow:
 https://github.com/aulamix001/CLA-3AA
+
+Detection troubleshooting:
+Install the full bundle, including Contents/x86_64-win and Contents/Resources.
+The 0.1.6 binaries statically link the Visual C++ runtime. Close the DAW before
+replacing the bundle; clear any blocked-plugin entry left by a failed earlier
+scan, then rescan. Plugin IDs are preserved for existing projects.

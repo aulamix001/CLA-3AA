@@ -16,7 +16,7 @@ inline void startupTrace(const char* stage,HRESULT result=S_OK){
     std::string clean(stage?stage:"unknown");
     for(auto& c:clean)if(c=='\r'||c=='\n')c=' ';
     char line[1024]{};
-    std::snprintf(line,sizeof(line),"CLA3A 0.1.5 tick=%llu pid=%lu tid=%lu %s hr=0x%08lX\r\n",
+    std::snprintf(line,sizeof(line),"CLA3A 0.1.6 tick=%llu pid=%lu tid=%lu %s hr=0x%08lX\r\n",
         static_cast<unsigned long long>(GetTickCount64()),GetCurrentProcessId(),GetCurrentThreadId(),clean.c_str(),static_cast<unsigned long>(result));
     OutputDebugStringA(line);
     const auto path=startupLogPath();

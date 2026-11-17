@@ -40,8 +40,9 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context){
 tresult PLUGIN_API Controller::setComponentState(IBStream* stream){Values values;if(!readState(stream,values))return kResultFalse;for(std::size_t i=0;i<parameterCount;++i)setParamNormalized(specs[i].id,normalize(i,values[i]));return kResultOk;}
 IPlugView* PLUGIN_API Controller::createView(FIDString name){StartupScope trace("Controller createView");return name&&std::strcmp(name,ViewType::kEditor)==0?new Editor(this):nullptr;}
 Values Controller::currentValues(){Values values;for(std::size_t i=0;i<parameterCount;++i)values[i]=denormalize(i,getParamNormalized(specs[i].id));return values;}
-void Controller::acceptValues(const Values& values){for(std::size_t i=0;i<parameterCount;++i){const auto value=normalize(i,values[i]);if(std::abs(getParamNormalized(specs[i].id)-value)<1.e-9)continue;beginEdit(specs[i].id);setParamNormalized(specs[i].id,value);performEdit(specs[i].id,value);endEdit(specs[i].id);}}
-void Controller::requestMeters(){if(auto message=owned(allocateMessage())){message->setMessageID("meter");sendMessage(message);}}
+void Controller::acceptValues(const Values& values){for(std::size_t i=0;i<parameterCount;++i){const auto value=normalize(i,values[i]);if(std::abs(getParamNormalized(specs[i].id)-value)<1.e-9)continue;beginEdit(specs[i].id);setParamNormalized(specs[i].id,value);performEdit(specs[i].id,value);endEdit(specs[i].id);if(externalEdit)externalEdit(externalContext,i,value);}}
+void Controller::syncExternalValues(){if(externalValues){Values values;externalValues(externalContext,values);for(std::size_t i=0;i<parameterCount;++i)setParamNormalized(specs[i].id,normalize(i,values[i]));}}
+void Controller::requestMeters(){if(externalMeters){std::array<double,3> values;externalMeters(externalContext,values);for(int i=0;i<3;++i)meters[i].store(values[i]);return;}if(auto message=owned(allocateMessage())){message->setMessageID("meter");sendMessage(message);}}
 tresult PLUGIN_API Controller::notify(IMessage* message){if(message&&std::strcmp(message->getMessageID(),"meter")==0){const char* names[]={"input","output","reduction"};for(int i=0;i<3;++i){double value=0.;if(message->getAttributes()->getFloat(names[i],value)==kResultOk&&std::isfinite(value))meters[i].store(value,std::memory_order_relaxed);}return kResultOk;}return EditController::notify(message);}
 
 constexpr UINT startBrowserMessage=WM_APP+71;
@@ -62,10 +63,10 @@ struct EditorState : std::enable_shared_from_this<EditorState> {
     std::wstring navigationUrl;
     ULONGLONG started=GetTickCount64();
     std::string lastStage="editor window";
-    std::wstring status=L"CLA-3A Studio 0.1.5: loading interface...";
+    std::wstring status=L"CLA-3A Studio 0.1.6: loading interface...";
     void stage(const char* name){
         lastStage=name;startupTrace(name);
-        if(!ready&&!failed){status=L"CLA-3A Studio 0.1.5: loading interface...\nStage: "+std::wstring(lastStage.begin(),lastStage.end());if(window)InvalidateRect(window,nullptr,TRUE);}
+        if(!ready&&!failed){status=L"CLA-3A Studio 0.1.6: loading interface...\nStage: "+std::wstring(lastStage.begin(),lastStage.end());if(window)InvalidateRect(window,nullptr,TRUE);}
     }
     void fail(const wchar_t* stage,HRESULT error){
         startupTrace(std::string(stage,stage+wcslen(stage)).c_str(),error);
@@ -77,7 +78,7 @@ struct EditorState : std::enable_shared_from_this<EditorState> {
     }
     void frame(){
         if(!active||!ready||!browser||!owner)return;
-        owner->requestMeters();
+        owner->syncExternalValues();owner->requestMeters();
         const auto values=owner->currentValues();
         std::ostringstream message;message.imbue(std::locale::classic());message.precision(12);
         message<<"{\"type\":\"native-state\",\"values\":[";
@@ -139,7 +140,7 @@ void EditorState::enableFallback(){
 }
 void EditorState::syncFallback(){
     if(!fallback||!owner||!fallbackControls[0])return;
-    const auto values=owner->currentValues();
+    owner->syncExternalValues();const auto values=owner->currentValues();
     for(int i=0;i<5;++i)SendMessageW(fallbackControls[i],TBM_SETPOS,TRUE,static_cast<LPARAM>(std::lround(normalize(i,values[i])*(i==Trim?360:1000))));
     for(int i=5;i<8;++i)SendMessageW(fallbackControls[i],CB_SETCURSEL,static_cast<WPARAM>(values[i]),0);
     SendMessageW(fallbackControls[Bypass],BM_SETCHECK,values[Bypass]>=.5?BST_CHECKED:BST_UNCHECKED,0);
@@ -226,7 +227,7 @@ static LRESULT CALLBACK windowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
         if(w==3&&(!state->painted||state->fallback)&&state->cover){SetWindowPos(state->cover,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE);InvalidateRect(state->cover,nullptr,FALSE);}
         if(w==2&&!state->painted&&GetTickCount64()-state->started>15000){
             startupTrace(("Timeout waiting for first painted frame; last="+state->lastStage).c_str(),HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-            state->status=L"CLA-3A Studio 0.1.5: loading timed out.\nLast stage: "+std::wstring(state->lastStage.begin(),state->lastStage.end())+L"\nStartup log: "+startupLogPath();
+            state->status=L"CLA-3A Studio 0.1.6: loading timed out.\nLast stage: "+std::wstring(state->lastStage.begin(),state->lastStage.end())+L"\nStartup log: "+startupLogPath();
             state->timedOut=true;state->enableFallback();
             KillTimer(window,2);if(state->cover)InvalidateRect(state->cover,nullptr,FALSE);InvalidateRect(window,nullptr,TRUE);
         }
@@ -235,7 +236,7 @@ static LRESULT CALLBACK windowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
     if(msg==WM_SIZE&&state){RECT bounds;GetClientRect(window,&bounds);if(state->browserController)state->browserController->put_Bounds(bounds);if(state->cover)MoveWindow(state->cover,0,0,bounds.right,bounds.bottom,TRUE);return 0;}
     return DefWindowProcW(window,msg,w,l);
 }
-static std::filesystem::path webDirectory(){wchar_t file[32768]{};GetModuleFileNameW(static_cast<HMODULE>(moduleHandle),file,32768);return std::filesystem::path(file).parent_path().parent_path()/L"Resources"/L"web";}
+static std::filesystem::path webDirectory(){wchar_t file[32768]{};GetModuleFileNameW(static_cast<HMODULE>(moduleHandle),file,32768);const std::filesystem::path binary(file);return binary.extension()==L".dll"?binary.parent_path()/L"CLA-3A Studio Resources"/L"web":binary.parent_path().parent_path()/L"Resources"/L"web";}
 static void startBrowser(const std::shared_ptr<EditorState>& state){
     StartupScope trace("startBrowser");
     std::weak_ptr<EditorState> weak=state;
@@ -332,7 +333,7 @@ tresult PLUGIN_API Editor::attached(void* parent,FIDString type){
 }
 tresult PLUGIN_API Editor::removed(){
     StartupScope trace("Editor removed");
-    if(state){state->active=false;state->owner=nullptr;if(state->browserController)state->browserController->Close();if(state->window){KillTimer(state->window,1);KillTimer(state->window,2);KillTimer(state->window,3);DestroyWindow(state->window);state->window=nullptr;state->cover=nullptr;}
+    if(state){state->active=false;state->owner=nullptr;if(state->browserController)state->browserController->Close();if(state->window){KillTimer(state->window,1);KillTimer(state->window,2);KillTimer(state->window,3);DestroyWindow(state->window);state->window=nullptr;state->cover=nullptr;UnregisterClassW(L"CLA3AStudioLoading",static_cast<HINSTANCE>(moduleHandle));UnregisterClassW(L"CLA3AStudioWebView",static_cast<HINSTANCE>(moduleHandle));}
         state->browser.Reset();state->browserController.Reset();state->environment.Reset();if(state->comInitialized){CoUninitialize();state->comInitialized=false;}}
     systemWindow=nullptr;return kResultTrue;
 }

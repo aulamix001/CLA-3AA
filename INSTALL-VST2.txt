@@ -1,0 +1,19 @@
+CLA-3A Studio 0.1.6 — VST2.4-compatible effect, Windows x64
+
+Extract the ZIP and keep these items beside each other in your configured VST2 folder:
+  CLA-3A Studio.dll
+  CLA-3A Studio Resources/
+
+Add that folder to your DAW's VST2 search paths and scan again.
+VST2 and VST3 use different search paths. Your host must support VST2 x64.
+Close the DAW before replacing installed files. If an earlier scan failed,
+clear the DAW's blocked-plugin entry and rescan the replacement.
+
+This DLL uses the same native DSP, 44 built-in programs and nine automatable
+parameters as the VST3. Stereo float/double audio and project-state chunks
+are supported. The graphical UI needs WebView2 Evergreen; native fallback
+controls remain available if the graphical editor cannot start.
+
+This independently implemented compatibility adapter uses no legacy VST2 SDK.
+Compatibility with every DAW is not claimed. Windows tests load both formats,
+process audio, restore state and exercise editor/host automation.

@@ -158,3 +158,22 @@ editor. Native controls do not depend on WebView2 loading successfully.
 CI tests native parameter editing and deliberately removes the generated HTML,
 verifying that the missing-resource failure automatically opens working native
 controls. The fixture is restored before packaging the release.
+
+## Windows scan compatibility and VST2 adapter (0.1.6)
+
+Both binaries link the Visual C++ runtime statically. Packaging rejects an
+MSVCP/VCRUNTIME DLL import, verifies x64 architecture and scanner exports,
+and keeps the original VST3 class IDs for existing projects. This addresses a
+potential load-time prerequisite; it does not establish the cause of a specific
+DAW's failed scan or clear an existing blocked-plugin entry on that computer.
+
+VST2 is supplied as a separate x64 DLL plus `CLA-3A Studio Resources/` beside it.
+The independent VST2.4 ABI adapter shares the native DSP, 44 programs, graphical
+editor, fallback controls and nine parameter mappings. The host must support
+VST2 x64 and scan the configured VST2 folder. The VST3 bundle belongs in the
+host's VST3 location. See INSTALL-VST2.txt and INSTALL-VST3.txt.
+
+A Windows test actually loads the two binary files, initializes a VST3
+processor, verifies the VST2 ABI, processes unity/compressed audio, round-trips
+state, selects programs and checks editor-to-host and host-to-editor parameter
+changes. The adapter is not a formal certification for every host.

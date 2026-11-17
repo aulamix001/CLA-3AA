@@ -16,6 +16,11 @@ public:
     void acceptValues(const Values&);
     Values currentValues();
     void requestMeters();
+    void* externalContext=nullptr;
+    void (*externalValues)(void*,Values&)=nullptr;
+    void (*externalMeters)(void*,std::array<double,3>&)=nullptr;
+    void (*externalEdit)(void*,std::size_t,double)=nullptr;
+    void syncExternalValues();
     std::array<std::atomic<double>,3> meters {{-120.,-120.,0.}};
 };
 struct EditorState;
