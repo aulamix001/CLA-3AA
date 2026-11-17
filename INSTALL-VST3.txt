@@ -1,0 +1,27 @@
+CLA-3A Studio — Windows x64 VST3, version 0.1.0
+
+1. Extract the ZIP.
+2. Copy the entire "CLA-3A Studio.vst3" folder to:
+   C:\Program Files\Common Files\VST3\
+   Keep its Contents and Resources subfolders intact.
+3. Restart/rescan VST3 plugins in a Windows 64-bit DAW.
+
+The 640 x 390 approved interface is bundled locally. Microsoft Edge WebView2
+Evergreen Runtime must be installed to display it. It normally comes with
+Windows 10/11. Official installer:
+https://developer.microsoft.com/microsoft-edge/webview2/
+
+The VST3 processes the DAW's mono/stereo input in native code. GAIN is applied
+after compression; Peak Reduction, frequency-sensitive sidechain, COMP/LIMITER,
+Analog, Mix, Trim, host automation, project-state restoration and the VU meter
+are connected. The browser's separate Audio demo is muted in the VST3: monitor
+the DAW track to hear processed audio.
+
+This is an independent interface recreation and native compressor. It does not
+contain or reproduce the proprietary Waves LA3AProc algorithm. Auto Makeup
+remains unimplemented. No Waves affiliation is implied.
+
+The binary is unsigned. Compilation and the Steinberg VST3 validator are checked
+by CI; compatibility with every DAW and Windows display configuration is not
+claimed. Source and build workflow:
+https://github.com/aulamix001/CLA-3AA

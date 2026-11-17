@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="46" height="24" viewBox="0 0 46 24">
+<defs>
+ <linearGradient id="shaft" x1="0" x2="0" y1="0" y2="1"><stop stop-color="#1d3111"/><stop offset=".13" stop-color="#8da574"/><stop offset=".28" stop-color="#f3ffe0"/><stop offset=".38" stop-color="#a1bb82"/><stop offset=".5" stop-color="#354d21"/><stop offset=".7" stop-color="#142807"/><stop offset=".83" stop-color="#688247"/><stop offset="1" stop-color="#263e0e"/></linearGradient>
+ <radialGradient id="cap" cx=".3" cy=".25"><stop stop-color="#c5d7ac"/><stop offset=".15" stop-color="#7b8d64"/><stop offset=".32" stop-color="#344820"/><stop offset=".65" stop-color="#0c1b03"/><stop offset="1" stop-color="#030b00"/></radialGradient>
+</defs>
+<path d="M8 4C22 4 30 8 43 6L45 19C31 18 22 23 8 21Z" fill="#030900" opacity=".7"/>
+<path d="M9 3C20 3 31 7 42 6L44 17C30 16 21 22 9 21Z" fill="url(#shaft)" stroke="#334c1d" stroke-width=".6"/>
+<path d="M14 5 39 8" fill="none" stroke="#f0ffe2" stroke-width=".7" opacity=".6"/>
+<ellipse cx="9.5" cy="12" rx="8.5" ry="9" fill="#0b1901"/>
+<ellipse cx="8.6" cy="11.3" rx="7.9" ry="8.5" fill="url(#cap)"/>
+<path d="M2.5 10a6.5 6.5 0 0 1 7-6" fill="none" stroke="#b9d19b" stroke-width=".7" opacity=".6"/>
+<ellipse cx="6" cy="7" rx="2" ry="1.2" fill="#d7e7bf" opacity=".35"/>
+</svg>

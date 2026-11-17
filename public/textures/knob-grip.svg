@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="106" viewBox="0 0 100 106">
+<defs>
+ <linearGradient id="side"><stop stop-color="#6d716b"/><stop offset=".16" stop-color="#393c37"/><stop offset=".55" stop-color="#161a14"/><stop offset="1" stop-color="#040703"/></linearGradient>
+ <linearGradient id="face"><stop stop-color="#151914"/><stop offset=".22" stop-color="#30362d"/><stop offset=".38" stop-color="#3a4035"/><stop offset=".5" stop-color="#262d22"/><stop offset=".83" stop-color="#11170d"/><stop offset="1" stop-color="#080d05"/></linearGradient>
+ <linearGradient id="edge"><stop stop-color="#8b9084" stop-opacity=".75"/><stop offset=".45" stop-color="#71796a" stop-opacity=".35"/><stop offset="1" stop-color="#030900"/></linearGradient>
+ <linearGradient id="top" x2="0" y2="1"><stop stop-color="#8e9388"/><stop offset=".3" stop-color="#535b49"/><stop offset="1" stop-color="#20281a"/></linearGradient>
+ <filter id="shadow" x="-1" y="-.1" width="3" height="1.3"><feGaussianBlur stdDeviation="2.4"/></filter>
+ <filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".5 .13" numOctaves="2" seed="10"/><feColorMatrix type="saturate" values="0"/></filter>
+ <clipPath id="front"><path d="M43 3 59 5 64 99 38 102Z"/></clipPath>
+</defs>
+<path d="M41 7 61 6 69 102 40 105Z" fill="#000" opacity=".9" filter="url(#shadow)"/>
+<path d="M37 5 43 1 60 3 64 7 66 101 60 105 32 103Z" fill="#080d05"/>
+<path d="M37 5 43 1 38 102 32 103Z" fill="url(#side)"/>
+<path d="M43 1 60 3 64 7 43 5 37 7Z" fill="url(#top)"/>
+<path d="M43 3 59 5 64 99 38 102Z" fill="url(#face)"/>
+<path d="M59 5 64 7 66 101 60 105 64 99Z" fill="#060b02"/>
+<path d="M38 102 64 99 60 105 32 103Z" fill="#0e1608"/>
+<path d="M43 4 38 101" fill="none" stroke="url(#edge)" stroke-width=".8"/>
+<path d="M59 6 64 99" fill="none" stroke="#000" stroke-width="1.3"/>
+<rect x="32" y="1" width="36" height="105" filter="url(#grain)" clip-path="url(#front)" opacity=".035" style="mix-blend-mode:soft-light"/>
+<path d="M47.5 5 50 5.3 48.7 22.6 46.5 23Z" fill="#e8e9de"/>
+<path d="M48.2 5.2 48.5 21" stroke="#fff" stroke-width=".5" opacity=".6"/>
+</svg>

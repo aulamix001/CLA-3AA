@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#161616"><title>CLA-3A — Classic Compressors</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <main class="plugin-stage" aria-label="CLA-3A Classic Compressor">
+      <div class="plugin">
+        <div class="plugin-toolbar"><div class="plugin-title"><svg viewBox="0 0 30 24" aria-hidden="true"><path d="M1 13 5 1 9 13 13 1 17 13 21 1 25 13 21 23 17 11 13 23 9 11 5 23z" fill="currentColor"/></svg><span>CLA CLASSIC COMPRESSORS</span></div><div class="toolbar-actions"><button id="undo" aria-label="Undo" disabled><svg viewBox="0 0 20 18" aria-hidden="true"><path d="M17 13a7 7 0 0 0-12-5L2 11M2 5v6h6"/></svg></button><button id="redo" aria-label="Redo" disabled><svg viewBox="0 0 20 18" aria-hidden="true"><path d="M3 13A7 7 0 0 1 15 8l3 3M18 5v6h-6"/></svg></button><button id="previous" aria-label="Previous preset"><svg viewBox="0 0 20 18" aria-hidden="true"><path d="M9 3 1 9l8 6v-4h9V7H9z" fill="currentColor" stroke="none"/></svg></button><button id="next" aria-label="Next preset"><svg viewBox="0 0 20 18" aria-hidden="true"><path d="m11 3 8 6-8 6v-4H2V7h9z" fill="currentColor" stroke="none"/></svg></button><button id="copy" title="Copy current settings to other slot">A→B</button><button id="setup" title="Switch comparison slot">Setup A</button><button id="save">Save</button><button id="menu-btn" aria-label="Settings menu" aria-expanded="false"><svg viewBox="0 0 18 18"><path d="M3 5h12M3 9h12M3 13h12"/></svg></button></div></div>
+        <div class="preset-bar"><button id="preset-btn" aria-haspopup="listbox" aria-expanded="false"><span id="preset-name">A: Start Me Up</span><span class="preset-chevron">⌄</span></button></div>
+        <div class="preset-menu popup" id="preset-menu" role="listbox" hidden></div><div class="settings-menu popup" id="settings-menu" hidden><button id="reset">Reset all controls <span>↺</span></button><button id="demo-open">Audio demo <span>▶</span></button><button id="about">About CLA-3A <span>↗</span></button></div>
+        <div class="faceplate">
+          
+          <div class="main-controls">
+            <div class="large-control gain-control"><h2>GAIN</h2><div class="knob-assembly" data-control="gain"></div><div class="control-readout"><span id="gain-readout">5.0</span><span class="readout-unit">INPUT GAIN</span></div></div>
+            <div class="meter-section"><div class="meter-case"><div class="meter-glass"><svg class="vu-svg" viewBox="0 0 360 154" role="img" aria-label="VU meter, gain reduction">
+<defs>
+  <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#a58c4d"/><stop offset=".12" stop-color="#dbc989"/><stop offset=".28" stop-color="#d1bd78"/><stop offset="1" stop-color="#c1ad67"/></linearGradient>
+  <radialGradient id="glow" cx=".15" cy=".05" r=".9"><stop stop-color="#fff0bb" stop-opacity=".5"/><stop offset="1" stop-color="#f7d47e" stop-opacity="0"/></radialGradient>
+  <linearGradient id="left-glass"><stop stop-color="#ffffd7" stop-opacity=".35"/><stop offset=".08" stop-color="#ffffd7" stop-opacity="0"/><stop offset=".94" stop-color="#312914" stop-opacity="0"/><stop offset="1" stop-color="#312914" stop-opacity=".5"/></linearGradient>
+  <filter id="paperNoise"><feTurbulence baseFrequency=".9" numOctaves="3" seed="8"/><feColorMatrix type="saturate" values="0"/></filter>
+</defs>
+<rect width="360" height="154" fill="url(#paper)"/><rect width="360" height="154" fill="url(#glow)"/>
+<g id="meter-scale"></g>
+<path d="M40 86 Q180 13 320 86" fill="none" stroke="#323120" stroke-width="2"/>
+<path d="M49 99 Q180 30 311 99" fill="none" stroke="#a84b30" stroke-width="2"/>
+<path d="M227 55 Q278 68 320 86" fill="none" stroke="#aa4930" stroke-width="2"/>
+<g fill="#393e27" transform="translate(160 96) scale(1.2)"><path d="M0 0 5 17 10 0 15 17 20 0 25 17 30 0 26 28 21 12 16 28 11 12 6 28z"/></g>
+<g id="needle" style="transform-origin:180px 192px"><path d="M179.6 207 180 26 180.5 207" fill="#a14229"/></g>
+<rect width="360" height="154" filter="url(#paperNoise)" opacity=".035" style="mix-blend-mode:multiply"/>
+<rect width="360" height="154" fill="url(#left-glass)"/>
+</svg><div class="meter-led"></div><div class="glass-shine"></div></div><div class="meter-base"><div class="meter-screw"></div></div></div></div>
+            <div class="large-control peak-control"><h2>PEAK<br>REDUCTION</h2><div class="knob-assembly" data-control="peak"></div><div class="control-readout"><span id="peak-readout">4.0</span><span class="readout-unit">COMPRESSION</span></div></div>
+          </div>
+          <div class="switch-row"><div class="vu-control"><span class="switch-heading">VU DISPLAY</span><div class="vu-options"><button data-vu="IN">IN</button><button class="toggle-switch vu-switch" id="vu-switch" aria-label="Cycle VU display"><span class="toggle-nut"></span><span class="toggle-lever"></span></button><button data-vu="OUT">OUT</button></div><button class="gr-label selected" data-vu="GR">GR</button></div><div class="model-logo">CLA-3A</div><div class="mode-control"><button id="comp-label" class="selected">COMP</button><button class="toggle-switch" id="mode-switch" role="switch" aria-checked="false" aria-label="Limiter mode"><span class="toggle-nut"></span><span class="toggle-lever"></span></button><button id="limiter-label">LIMITER</button></div></div>
+        </div>
+        <div class="bottom-panel"><div class="analog-group"><span class="bottom-label">ANALOG</span><div class="analog-options" role="group" aria-label="Analog noise"><button data-analog="50Hz">50Hz</button><button data-analog="60Hz">60Hz</button><button data-analog="OFF" class="active">OFF</button></div></div><div class="small-control hi-control"><label>HI FREQ</label><div class="small-knob" data-control="hifreq"></div><span id="hifreq-value" class="flat-label">[ FLAT ]</span></div><div class="small-control mix-control"><label>MIX</label><div class="small-knob" data-control="mix"></div><div class="mini-value" id="mix-value">100<span>%</span></div></div><div class="small-control trim-control"><label>TRIM</label><div class="small-knob" data-control="trim"></div><div class="mini-value" id="trim-value">0.0<span>dB</span></div></div></div>
+        
+      </div>
+
+  </main>
+  <dialog id="audition-dialog"><button class="close-dialog" aria-label="Close audio demo">×</button><section class="audition"><div class="audition-info"><div class="audio-icon"><svg viewBox="0 0 24 24"><path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/></svg></div><div><h3>Hear the character</h3><p>A little compression goes a long way.</p></div></div><div class="demo-controls"><select id="source" aria-label="Demo sound"><option value="keys">Studio keys</option><option value="bass">Electric bass</option><option value="drums">Drum groove</option></select><button id="play" class="play-btn" aria-label="Play demo"><svg viewBox="0 0 20 20"><path d="m7 4 9 6-9 6z" fill="currentColor"/></svg><span>Play demo</span></button><button id="bypass" role="switch" aria-checked="false"><span class="bypass-switch"></span>Bypass</button></div><div class="demo-level"><span class="level-bars"></span><span id="signal-label">SIGNAL IDLE</span></div></section></dialog>
+<dialog id="guide"><button class="close-dialog" aria-label="Close guide">×</button><div class="eyebrow">THE CLASSIC COLLECTION</div><h2>A classic, under control.</h2><p>The CLA-3A brings the character of a vintage optical compressor to your browser.</p><div class="guide-grid"><article><h3>01 / Shape the signal</h3><p>Drag Gain and Peak Reduction up or down. Hold Shift for finer adjustments. Double-click any knob to restore its default.</p></article><article><h3>02 / Find your balance</h3><p>Use Mix for parallel compression and Trim to balance the output. COMP gives gentle leveling; LIMITER applies a firmer ratio.</p></article><article><h3>03 / Compare & save</h3><p>Switch between Setup A and B to compare settings. A→B copies the current slot. Save stores your preset in this browser.</p></article><article><h3>04 / Listen</h3><p>Play a synthesized demo and adjust the compressor. Bypass compares the dry signal. VU Display selects input, gain reduction, or output metering.</p></article></div><p class="guide-note">Interface recreation with a browser audio demonstration. The demo uses Web Audio compression, not an emulation of Waves DSP.</p></dialog>
+  <div class="toast" role="status" id="toast"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

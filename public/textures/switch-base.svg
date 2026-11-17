@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="44" height="46" viewBox="0 0 44 46">
+<defs>
+ <linearGradient id="metal" x2=".9" y2="1"><stop stop-color="#b8bfb8"/><stop offset=".19" stop-color="#fcfff5"/><stop offset=".23" stop-color="#a8b1a3"/><stop offset=".45" stop-color="#57634f"/><stop offset=".54" stop-color="#e4edd9"/><stop offset=".74" stop-color="#929e85"/><stop offset=".86" stop-color="#e8efdd"/><stop offset="1" stop-color="#46533c"/></linearGradient>
+ <linearGradient id="bevel" x2=".3" y2="1"><stop stop-color="#f9fff0"/><stop offset=".2" stop-color="#abb99a"/><stop offset=".49" stop-color="#677654"/><stop offset=".68" stop-color="#8b9c78"/><stop offset=".9" stop-color="#e2ebce"/><stop offset="1" stop-color="#55643f"/></linearGradient>
+ <radialGradient id="ring" cx=".35" cy=".3"><stop offset=".58" stop-color="#21350b"/><stop offset=".65" stop-color="#677d45"/><stop offset=".69" stop-color="#ecf3d9"/><stop offset=".78" stop-color="#8ba566"/><stop offset=".83" stop-color="#222f12"/><stop offset=".91" stop-color="#c3d5a6"/><stop offset="1" stop-color="#5d7740"/></radialGradient>
+ <radialGradient id="hole" cx=".4" cy=".2"><stop stop-color="#5f7840"/><stop offset=".5" stop-color="#233812"/><stop offset="1" stop-color="#071201"/></radialGradient>
+</defs>
+<path d="M11 1 33 1 44 12 44 34 33 45 11 45 0 34 0 12Z" fill="#15250b"/>
+<path d="M11 0 33 0 44 11 44 33 33 44 11 44 0 33 0 11Z" fill="url(#metal)"/>
+<path d="M12 2 32 2 42 12 42 32 32 42 12 42 2 32 2 12Z" fill="url(#bevel)" stroke="#f1f6e4" stroke-opacity=".28" stroke-width=".5"/>
+<path d="M1 12 11 1 32 1" fill="none" stroke="#fff" stroke-opacity=".7" stroke-width=".8"/>
+<path d="M43 13 43 33 33 43 12 43" fill="none" stroke="#172806" stroke-opacity=".7" stroke-width="1"/>
+<circle cx="22" cy="22" r="16.2" fill="#2f431b"/>
+<circle cx="22" cy="21.5" r="15.6" fill="url(#ring)"/>
+<circle cx="22" cy="21.5" r="9.5" fill="url(#hole)" stroke="#182b08" stroke-width=".8"/>
+<path d="M9 21a13 13 0 0 1 19-11" fill="none" stroke="#f7ffe5" stroke-opacity=".5" stroke-width=".7"/>
+<path d="M35 22a13 13 0 0 1-20 11" fill="none" stroke="#1c300a" stroke-opacity=".55" stroke-width=".7"/>
+</svg>
