@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(CLA3AStudio VERSION 0.1.0 LANGUAGES CXX)
+project(CLA3AStudio VERSION 0.1.1 LANGUAGES CXX)
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "This release target requires Windows x64. Native DSP tests can also be built directly with g++.")
 endif()

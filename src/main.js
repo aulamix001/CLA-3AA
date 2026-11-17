@@ -1,3 +1,4 @@
+import {meterAngle} from './vu-meter.js';
 import { PARAMETERS, STARTUP_SETTINGS, RESET_SETTINGS, KNOB_RANGES, BUILT_IN_PRESETS, RESET_PRESET_INDEX,
   PRESET_SCHEMA_VERSION, applyPreset, normalizeControlValue, loadUserPresets, hfControlOffset } from './cla3a-config.js';
 const $ = (s) => document.querySelector(s);
@@ -64,6 +65,7 @@ function render(){
  $('#mix-value').innerHTML=`${Math.round(state.mix)}<span>%</span>`;$('#trim-value').innerHTML=`${state.trim>0?'+':''}${state.trim.toFixed(1)}<span>dB</span>`;$('#hifreq-value').textContent=state.hifreq===PARAMETERS.hifreq.reset?'[ FLAT ]':`[ ${Math.round(state.hifreq)} ]`;
  $$('[data-analog]').forEach(b=>{b.classList.toggle('active',b.dataset.analog===state.analog);b.setAttribute('aria-pressed',b.dataset.analog===state.analog);});
  $$('[data-vu]').forEach(b=>{b.classList.toggle('selected',b.dataset.vu===state.vu);b.setAttribute('aria-pressed',b.dataset.vu===state.vu);});
+ $('.vu-svg').setAttribute('aria-label',`VU meter: ${state.vu}, ${state.vu==='GR'?'gain reduction in dB':'0 VU = -18 dBFS RMS'}`);
  $('#vu-switch').dataset.mode=state.vu;$('#vu-switch').setAttribute('aria-label',`VU display: ${state.vu}. Click to cycle.`);
  $('#mode-switch').classList.toggle('on',state.mode==='LIMITER');$('#mode-switch').setAttribute('aria-checked',state.mode==='LIMITER');$('#comp-label').classList.toggle('selected',state.mode==='COMP');$('#limiter-label').classList.toggle('selected',state.mode==='LIMITER');
  $('#setup').textContent=`Setup ${slot}`;$('#copy').textContent=slot==='A'?'A→B':'B→A';$('#preset-name').textContent=`${slot}: ${presetTitle}`;historyUI();updateAudio();postNativeState();
@@ -94,12 +96,22 @@ function updateAudio(){if(!audio)return;const {ctx,input,comp,dry,wet,output,hum
 function voice(freq,time,duration,type='triangle',volume=.2){const {ctx,input}=audio,o=ctx.createOscillator(),g=ctx.createGain();o.type=type;o.frequency.value=freq;g.gain.setValueAtTime(0,time);g.gain.linearRampToValueAtTime(volume,time+.008);g.gain.exponentialRampToValueAtTime(.0001,time+duration);o.connect(g);g.connect(input);o.start(time);o.stop(time+duration+.05);audio.voices.push({o,g});o.onended=()=>{o.disconnect();g.disconnect();audio.voices=audio.voices.filter(v=>v.o!==o);};return o;}
 function noiseHit(time,duration,volume,highpass){const {ctx,input,noise}=audio,n=ctx.createBufferSource(),g=ctx.createGain(),filter=ctx.createBiquadFilter();n.buffer=noise;filter.type='highpass';filter.frequency.value=highpass;g.gain.setValueAtTime(volume,time);g.gain.exponentialRampToValueAtTime(.0001,time+duration);n.connect(filter);filter.connect(g);g.connect(input);n.start(time);n.stop(time+duration);audio.voices.push({o:n,g});n.onended=()=>{n.disconnect();g.disconnect();filter.disconnect();audio.voices=audio.voices.filter(v=>v.o!==n);};}
 function schedule(){if(!playing)return;while(nextBeat<audio.ctx.currentTime+.16){const source=$('#source').value;const t=nextBeat;if(source==='keys'){if(beat%4===0){const chords=[[130.81,164.81,196],[110,130.81,164.81],[87.31,130.81,174.61],[98,123.47,146.83]];chords[Math.floor(beat/4)%4].forEach((f,i)=>voice(f,t+i*.025,1.7,'triangle',.13));}voice([523.25,392,440,329.63,392,293.66,329.63,392][beat%8],t,.3,'sine',beat%2?.055:.09);}else if(source==='bass'){const f=[65.41,65.41,98,73.42,55,55,82.41,61.74][beat%8];voice(f,t,.42,'triangle',.45);voice(f*2,t,.15,'sine',.1);}else{noiseHit(t,.045,.06,7000);if(beat%4===0||beat%8===3){const o=voice(135,t,.35,'sine',.65);o.frequency.exponentialRampToValueAtTime(42,t+.25);}if(beat%4===2){noiseHit(t,.17,.25,1000);voice(170,t,.1,'triangle',.15);}}beat++;nextBeat+=.25;}}
-function meterLoop(){if(!playing)return;let angle=18;if(state.vu==='GR')angle=18-Math.min(54,Math.abs(audio.comp.reduction)*3);else{const analyser=state.vu==='IN'?audio.inputMeter:audio.outputMeter;const samples=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(samples);const rms=Math.sqrt(samples.reduce((sum,v)=>sum+v*v,0)/samples.length);const db=20*Math.log10(Math.max(rms,.00001));angle=Math.max(-54,Math.min(52,(db+23)*3.4-25));}$('#needle').style.transform=`rotate(${angle}deg)`;animation=requestAnimationFrame(meterLoop);}
-$('#play').onclick=async()=>{if(nativeBridge)return;try{if(!audio)setupAudio();await audio.ctx.resume();playing=!playing;if(playing){nextBeat=audio.ctx.currentTime+.04;beat=0;schedule();timer=setInterval(schedule,70);meterLoop();}else{clearInterval(timer);cancelAnimationFrame(animation);audio.voices.forEach(v=>{try{v.o.stop();}catch{}});$('#needle').style.transform='rotate(18deg)';}updateAudio();$('#play').innerHTML=playing?'<svg viewBox="0 0 20 20"><path d="M6 4h3v12H6zM12 4h3v12h-3z" fill="currentColor"/></svg><span>Stop demo</span>':'<svg viewBox="0 0 20 20"><path d="m7 4 9 6-9 6z" fill="currentColor"/></svg><span>Play demo</span>';$('#play').setAttribute('aria-label',playing?'Stop demo':'Play demo');$('.audition').classList.toggle('is-playing',playing);$('#signal-label').textContent=playing?'SIGNAL ACTIVE':'SIGNAL IDLE';}catch{toast('Audio could not start. Check browser audio permissions.');}};
+function meterLoop(){
+ if(!playing)return;
+ const levels=[-120,-120,bypass?0:Math.abs(audio.comp.reduction)];
+ for(const [index,analyser] of [audio.inputMeter,audio.outputMeter].entries()){
+  const samples=new Float32Array(analyser.fftSize);analyser.getFloatTimeDomainData(samples);
+  const power=samples.reduce((sum,v)=>sum+v*v,0)/samples.length;
+  levels[index]=10*Math.log10(Math.max(power,1.e-12));
+ }
+ $('#needle').style.transform=`rotate(${meterAngle(state.vu,levels,bypass)}deg)`;
+ animation=requestAnimationFrame(meterLoop);
+}
+$('#play').onclick=async()=>{if(nativeBridge)return;try{if(!audio)setupAudio();await audio.ctx.resume();playing=!playing;if(playing){nextBeat=audio.ctx.currentTime+.04;beat=0;schedule();timer=setInterval(schedule,70);meterLoop();}else{clearInterval(timer);cancelAnimationFrame(animation);audio.voices.forEach(v=>{try{v.o.stop();}catch{}});$('#needle').style.transform=`rotate(${meterAngle(state.vu,[-120,-120,0],bypass)}deg)`;}updateAudio();$('#play').innerHTML=playing?'<svg viewBox="0 0 20 20"><path d="M6 4h3v12H6zM12 4h3v12h-3z" fill="currentColor"/></svg><span>Stop demo</span>':'<svg viewBox="0 0 20 20"><path d="m7 4 9 6-9 6z" fill="currentColor"/></svg><span>Play demo</span>';$('#play').setAttribute('aria-label',playing?'Stop demo':'Play demo');$('.audition').classList.toggle('is-playing',playing);$('#signal-label').textContent=playing?'SIGNAL ACTIVE':'SIGNAL IDLE';}catch{toast('Audio could not start. Check browser audio permissions.');}};
 $('#bypass').onclick=()=>{bypass=!bypass;$('#bypass').setAttribute('aria-checked',bypass);updateAudio();postNativeState();toast(bypass?'Bypass on · dry signal':'Compressor active');};
 $('#source').onchange=()=>{beat=0;};
 $('#audition-dialog').addEventListener('close',()=>{if(playing)$('#play').click();});
-$('#needle').style.transform='rotate(18deg)';render();
+$('#needle').style.transform=`rotate(${meterAngle(state.vu,[-120,-120,0],bypass)}deg)`;render();
 
 // Native VST3 parameter transport. Existing drawing and browser behavior stay intact.
 function postNativeState(){
@@ -121,8 +133,7 @@ nativeBridge?.addEventListener('message',({data})=>{
   if(bypass!==nextBypass){bypass=nextBypass;$('#bypass').setAttribute('aria-checked',bypass);changed=true;}
   if(changed)render();
   if(Array.isArray(data.meters)&&data.meters.length===3&&data.meters.every(Number.isFinite)){
-   const db=state.vu==='IN'?data.meters[0]:data.meters[1];
-   const angle=state.vu==='GR'?18-Math.min(54,Math.max(0,data.meters[2])*3):Math.max(-54,Math.min(52,18+(db+18)*2.4));
+   const angle=meterAngle(state.vu,data.meters,bypass);
    $('#needle').style.transform=`rotate(${angle}deg)`;
   }
  }finally{applyingNative=false;}

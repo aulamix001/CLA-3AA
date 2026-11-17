@@ -1,4 +1,4 @@
-CLA-3A Studio — Windows x64 VST3, version 0.1.0
+CLA-3A Studio — Windows x64 VST3, version 0.1.1
 
 1. Extract the ZIP.
 2. Copy the entire "CLA-3A Studio.vst3" folder to:

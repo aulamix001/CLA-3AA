@@ -23,5 +23,50 @@ int main(){try{
  require(std::isfinite(silence.tick(std::numeric_limits<double>::quiet_NaN(),0).first),"NaN input not sanitized");++checks;
  for(std::size_t i=0;i<Cla::parameterCount;++i){require(std::abs(Cla::denormalize(i,Cla::normalize(i,Cla::specs[i].initial))-Cla::specs[i].initial)<1.e-10,"parameter normalization mismatch");}
  ++checks;
+ // Exercise the complete audio-to-meter relationship, not only knob metadata.
+ double lastReduction=-1.;
+ for(double peak:{0.,2.,4.,6.,8.,10.}){
+  Cla::Dsp d;auto settings=clean();settings[Cla::Peak]=peak;d.setValues(settings);d.prepare(48000);
+  run(d,1000,.3,192000,48000);
+  const auto reduction=d.reductionDb();
+  require(reduction>=lastReduction,"Peak Reduction must not reduce compression when turned up");
+  require(std::abs((d.inputDb()-d.outputDb())-reduction)<.15,"GR meter disagrees with measured attenuation at unity gain");
+  std::cout<<"Peak "<<peak<<": GR "<<reduction<<" dB; IN "<<d.inputDb()<<" dBFS; OUT "<<d.outputDb()<<" dBFS\n";
+  lastReduction=reduction;
+ }
+ require(lastReduction>10.,"Peak sweep did not exercise meaningful compression");++checks;
+ {
+  Cla::Dsp base,gain,trim,mix;auto settings=clean();settings[Cla::Peak]=6;
+  base.setValues(settings);base.prepare(48000);
+  settings[Cla::Gain]+=1.;gain.setValues(settings);gain.prepare(48000);
+  settings[Cla::Gain]=4.08;settings[Cla::Trim]=6.;trim.setValues(settings);trim.prepare(48000);
+  settings[Cla::Trim]=0.;settings[Cla::Mix]=0.;mix.setValues(settings);mix.prepare(48000);
+  for(auto d:{&base,&gain,&trim,&mix})run(*d,1000,.3,192000,48000);
+  require(std::abs(gain.outputDb()-base.outputDb()-6.)<.01,"Gain must add 6 dB per unit after compression");
+  require(std::abs(trim.outputDb()-base.outputDb()-6.)<.01,"Trim output calibration incorrect");
+  require(std::abs(mix.outputDb()-mix.inputDb())<.01,"Mix 0 must meter the dry output");
+  for(auto d:{&gain,&trim,&mix}){
+   require(std::abs(d->inputDb()-base.inputDb())<.01,"output controls changed input meter");
+   require(std::abs(d->reductionDb()-base.reductionDb())<.01,"output controls changed gain reduction meter");
+  }
+ }++checks;
+ {
+  Cla::Dsp d;auto settings=clean();d.setValues(settings);d.prepare(48000);
+  run(d,1000,std::sqrt(2.)*std::pow(10.,-18./20.),192000,48000);
+  require(std::abs(d.inputDb()+18.)<.01,"IN RMS calibration must read -18 dBFS at 0 VU");
+  require(std::abs(d.outputDb()+18.)<.01,"OUT RMS calibration must read -18 dBFS at unity");
+  settings[Cla::Peak]=8;settings[Cla::Bypass]=1;d.setValues(settings);run(d,1000,.5,192000,48000);
+  require(d.reductionDb()==0.&&std::abs(d.inputDb()-d.outputDb())<.01,"bypass metering must indicate dry signal and zero GR");
+ }++checks;
+ {
+  Cla::Dsp flatHigh,contourHigh;auto settings=clean();settings[Cla::Peak]=6;
+  flatHigh.setValues(settings);flatHigh.prepare(48000);settings[Cla::HiFreq]=0;
+  contourHigh.setValues(settings);contourHigh.prepare(48000);
+  run(flatHigh,10000,.2,192000,48000);run(contourHigh,10000,.2,192000,48000);
+  require(contourHigh.reductionDb()>flatHigh.reductionDb(),"HF contour must increase high-frequency sensitivity");
+ }++checks;
+ for(std::size_t i=Cla::Meter;i<Cla::parameterCount;++i){
+  require(Cla::denormalize(i,.3)==std::round(.3*Cla::specs[i].max),"switch automation must select a discrete state");
+ }++checks;
  std::cout<<"PASS: "<<checks<<" native DSP checks (44.1/48/96/192 kHz, stereo, unity, bypass, ratio, makeup, contour, Mix and hum).\n";return 0;
  }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

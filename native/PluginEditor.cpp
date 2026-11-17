@@ -35,7 +35,7 @@ IPlugView* PLUGIN_API Controller::createView(FIDString name){return name&&std::s
 Values Controller::currentValues(){Values values;for(std::size_t i=0;i<parameterCount;++i)values[i]=denormalize(i,getParamNormalized(specs[i].id));return values;}
 void Controller::acceptValues(const Values& values){for(std::size_t i=0;i<parameterCount;++i){const auto value=normalize(i,values[i]);if(std::abs(getParamNormalized(specs[i].id)-value)<1.e-9)continue;beginEdit(specs[i].id);setParamNormalized(specs[i].id,value);performEdit(specs[i].id,value);endEdit(specs[i].id);}}
 void Controller::requestMeters(){if(auto message=owned(allocateMessage())){message->setMessageID("meter");sendMessage(message);}}
-tresult PLUGIN_API Controller::notify(IMessage* message){if(message&&std::strcmp(message->getMessageID(),"meter")==0){message->getAttributes()->getFloat("input",meters[0]);message->getAttributes()->getFloat("output",meters[1]);message->getAttributes()->getFloat("reduction",meters[2]);return kResultOk;}return EditController::notify(message);}
+tresult PLUGIN_API Controller::notify(IMessage* message){if(message&&std::strcmp(message->getMessageID(),"meter")==0){const char* names[]={"input","output","reduction"};for(int i=0;i<3;++i){double value=0.;if(message->getAttributes()->getFloat(names[i],value)==kResultOk&&std::isfinite(value))meters[i].store(value,std::memory_order_relaxed);}return kResultOk;}return EditController::notify(message);}
 
 struct EditorState {
     bool active=true,ready=false,comInitialized=false;
@@ -44,7 +44,15 @@ struct EditorState {
     ComPtr<ICoreWebView2Environment> environment;
     ComPtr<ICoreWebView2Controller> browserController;
     ComPtr<ICoreWebView2> browser;
-    std::string lastValues;
+    ULONGLONG started=GetTickCount64();
+    std::wstring status=L"CLA-3A Studio: loading interface...";
+    void fail(const wchar_t* stage,HRESULT error){
+        std::wostringstream text;text<<L"CLA-3A Studio: "<<stage<<L" (0x"<<std::hex<<static_cast<unsigned long>(error)<<L").\n"
+            <<L"Check the WebView2 Runtime and the complete VST3 Resources folder.";
+        ready=false;status=text.str();if(browserController)browserController->put_IsVisible(FALSE);
+        if(window){KillTimer(window,2);InvalidateRect(window,nullptr,TRUE);}
+        OutputDebugStringW(status.c_str());
+    }
     void frame(){
         if(!active||!ready||!browser||!owner)return;
         owner->requestMeters();
@@ -52,12 +60,12 @@ struct EditorState {
         std::ostringstream message;message.imbue(std::locale::classic());message.precision(12);
         message<<"{\"type\":\"native-state\",\"values\":[";
         for(std::size_t i=0;i<parameterCount;++i){if(i)message<<',';message<<values[i];}message<<"],\"meters\":[";
-        for(std::size_t i=0;i<3;++i){if(i)message<<',';message<<owner->meters[i];}message<<"]}";
+        for(std::size_t i=0;i<3;++i){if(i)message<<',';message<<owner->meters[i].load(std::memory_order_relaxed);}message<<"]}";
         const std::string ascii=message.str();std::wstring wide(ascii.begin(),ascii.end());browser->PostWebMessageAsJson(wide.c_str());
     }
     void message(const std::wstring& input){
         if(!active||!owner)return;
-        if(input==L"ready"){ready=true;frame();return;}
+        if(input==L"ready"){ready=true;KillTimer(window,2);if(browserController)browserController->put_IsVisible(TRUE);frame();return;}
         if(input.rfind(L"params:",0)!=0)return;
         std::wistringstream reader(input.substr(7));reader.imbue(std::locale::classic());Values values{};
         for(std::size_t i=0;i<parameterCount;++i){if(!(reader>>values[i])||!std::isfinite(values[i]))return;if(i+1<parameterCount){wchar_t comma=0;if(!(reader>>comma)||comma!=L',')return;}}
@@ -67,7 +75,21 @@ struct EditorState {
 static LRESULT CALLBACK windowProc(HWND window,UINT msg,WPARAM w,LPARAM l){
     auto state=reinterpret_cast<EditorState*>(GetWindowLongPtrW(window,GWLP_USERDATA));
     if(msg==WM_NCCREATE){auto create=reinterpret_cast<CREATESTRUCTW*>(l);state=static_cast<EditorState*>(create->lpCreateParams);SetWindowLongPtrW(window,GWLP_USERDATA,reinterpret_cast<LONG_PTR>(state));}
-    if(msg==WM_TIMER&&state){state->frame();return 0;}
+    if(msg==WM_PAINT&&state){
+        PAINTSTRUCT paint;auto dc=BeginPaint(window,&paint);RECT area;GetClientRect(window,&area);
+        FillRect(dc,&area,reinterpret_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+        SetBkMode(dc,TRANSPARENT);SetTextColor(dc,RGB(220,220,210));InflateRect(&area,-24,-24);
+        DrawTextW(dc,state->status.c_str(),-1,&area,DT_LEFT|DT_WORDBREAK|DT_NOPREFIX);
+        EndPaint(window,&paint);return 0;
+    }
+    if(msg==WM_TIMER&&state){
+        if(w==1)state->frame();
+        if(w==2&&!state->ready&&GetTickCount64()-state->started>15000){
+            state->status=L"CLA-3A Studio: WebView2 is taking longer than expected.\nCheck Microsoft Edge WebView2 Runtime. Close and reopen the editor if loading does not finish.";
+            KillTimer(window,2);InvalidateRect(window,nullptr,TRUE);
+        }
+        return 0;
+    }
     if(msg==WM_SIZE&&state&&state->browserController){RECT bounds;GetClientRect(window,&bounds);state->browserController->put_Bounds(bounds);return 0;}
     return DefWindowProcW(window,msg,w,l);
 }
@@ -76,26 +98,39 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
     std::weak_ptr<EditorState> weak=state;
     wchar_t temp[MAX_PATH]{};GetTempPathW(MAX_PATH,temp);
     const auto folder=(std::filesystem::path(temp)/L"CLA3AStudio-WebView2").wstring();
-    CreateCoreWebView2EnvironmentWithOptions(nullptr,folder.c_str(),nullptr,
+    const auto startup=CreateCoreWebView2EnvironmentWithOptions(nullptr,folder.c_str(),nullptr,
       Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>([weak](HRESULT error,ICoreWebView2Environment* environment)->HRESULT{
         auto s=weak.lock();if(!s||!s->active)return S_OK;
-        if(FAILED(error)||!environment){MessageBoxW(s->window,L"Install Microsoft Edge WebView2 Evergreen Runtime to display the approved CLA-3A interface. Audio processing remains available in the DAW.",L"CLA-3A Studio",MB_OK|MB_ICONINFORMATION);return S_OK;}
+        if(FAILED(error)||!environment){s->fail(L"WebView2 environment failed",FAILED(error)?error:E_FAIL);return S_OK;}
         s->environment=environment;
-        environment->CreateCoreWebView2Controller(s->window,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>([weak](HRESULT result,ICoreWebView2Controller* controller)->HRESULT{
-          auto s=weak.lock();if(!s||!s->active)return S_OK;if(FAILED(result)||!controller)return S_OK;
-          s->browserController=controller;controller->get_CoreWebView2(&s->browser);
+        const auto creation=environment->CreateCoreWebView2Controller(s->window,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>([weak](HRESULT result,ICoreWebView2Controller* controller)->HRESULT{
+          auto s=weak.lock();if(!s||!s->active)return S_OK;if(FAILED(result)||!controller){s->fail(L"WebView2 controller failed",FAILED(result)?result:E_FAIL);return S_OK;}
+          s->browserController=controller;const auto view=controller->get_CoreWebView2(&s->browser);if(FAILED(view)||!s->browser){s->fail(L"WebView2 interface unavailable",FAILED(view)?view:E_FAIL);return S_OK;}
           ComPtr<ICoreWebView2Controller3> pixels;
           if(SUCCEEDED(s->browserController.As(&pixels))){pixels->put_ShouldDetectMonitorScaleChanges(FALSE);pixels->put_RasterizationScale(1.0);pixels->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);}
-          RECT bounds;GetClientRect(s->window,&bounds);controller->put_Bounds(bounds);controller->put_IsVisible(TRUE);
+          RECT bounds;GetClientRect(s->window,&bounds);controller->put_Bounds(bounds);controller->put_IsVisible(FALSE);
           ComPtr<ICoreWebView2Settings> settings;s->browser->get_Settings(&settings);settings->put_AreDevToolsEnabled(FALSE);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_IsZoomControlEnabled(FALSE);
           ComPtr<ICoreWebView2_8> audio;if(SUCCEEDED(s->browser.As(&audio)))audio->put_IsMuted(TRUE);
-          ComPtr<ICoreWebView2_3> resources;if(FAILED(s->browser.As(&resources)))return S_OK;
-          auto folder=webDirectory().wstring();resources->SetVirtualHostNameToFolderMapping(L"cla3a.local",folder.c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+          ComPtr<ICoreWebView2_3> resources;if(FAILED(s->browser.As(&resources))){s->fail(L"Update WebView2 Runtime",E_NOINTERFACE);return S_OK;}
+          auto directory=webDirectory();std::error_code fileError;
+          if(!std::filesystem::is_regular_file(directory/L"index.html",fileError)){s->fail(L"Missing Resources/web/index.html",HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND));return S_OK;}
+          auto folder=directory.wstring();const auto mapping=resources->SetVirtualHostNameToFolderMapping(L"cla3a.local",folder.c_str(),COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_DENY_CORS);
+          if(FAILED(mapping)){s->fail(L"Local interface mapping failed",mapping);return S_OK;}
           EventRegistrationToken token{};
           s->browser->add_WebMessageReceived(Callback<ICoreWebView2WebMessageReceivedEventHandler>([weak](ICoreWebView2*,ICoreWebView2WebMessageReceivedEventArgs* args)->HRESULT{auto s=weak.lock();if(!s||!s->active)return S_OK;LPWSTR text=nullptr;if(SUCCEEDED(args->TryGetWebMessageAsString(&text))&&text){s->message(text);CoTaskMemFree(text);}return S_OK;}).Get(),&token);
-          s->browser->Navigate(L"https://cla3a.local/index.html");SetTimer(s->window,1,40,nullptr);return S_OK;
-        }).Get());return S_OK;
+          s->browser->add_NavigationCompleted(Callback<ICoreWebView2NavigationCompletedEventHandler>([weak](ICoreWebView2*,ICoreWebView2NavigationCompletedEventArgs* args)->HRESULT{
+            auto s=weak.lock();if(!s||!s->active)return S_OK;BOOL success=FALSE;args->get_IsSuccess(&success);
+            if(!success){COREWEBVIEW2_WEB_ERROR_STATUS status;args->get_WebErrorStatus(&status);s->fail(L"Interface navigation failed",static_cast<HRESULT>(status));}return S_OK;
+          }).Get(),&token);
+          s->browser->add_ProcessFailed(Callback<ICoreWebView2ProcessFailedEventHandler>([weak](ICoreWebView2*,ICoreWebView2ProcessFailedEventArgs*)->HRESULT{
+            auto s=weak.lock();if(s&&s->active)s->fail(L"WebView2 process failed; reopen the editor",E_FAIL);return S_OK;
+          }).Get(),&token);
+          const auto navigation=s->browser->Navigate(L"https://cla3a.local/index.html");
+          if(FAILED(navigation)){s->fail(L"Cannot load interface",navigation);return S_OK;}
+          SetTimer(s->window,1,40,nullptr);return S_OK;
+        }).Get());if(FAILED(creation))s->fail(L"Cannot create WebView2 controller",creation);return S_OK;
       }).Get());
+    if(FAILED(startup))state->fail(L"Cannot start WebView2",startup);
 }
 Editor::Editor(Controller* controller):owner(controller),state(std::make_shared<EditorState>()){owner->addRef();state->owner=owner;rect=ViewRect(0,0,640,390);}
 Editor::~Editor(){removed();owner->release();}
@@ -106,10 +141,12 @@ tresult PLUGIN_API Editor::attached(void* parent,FIDString type){
     auto result=CoInitializeEx(nullptr,COINIT_APARTMENTTHREADED);state->comInitialized=SUCCEEDED(result);
     WNDCLASSW cls{};cls.lpfnWndProc=windowProc;cls.hInstance=static_cast<HINSTANCE>(moduleHandle);cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.lpszClassName=L"CLA3AStudioWebView";RegisterClassW(&cls);
     state->window=CreateWindowExW(0,cls.lpszClassName,L"",WS_CHILD|WS_VISIBLE|WS_CLIPCHILDREN,0,0,640,390,static_cast<HWND>(parent),nullptr,cls.hInstance,state.get());
-    if(!state->window)return kResultFalse;systemWindow=parent;startBrowser(state);return kResultTrue;
+    if(!state->window)return kResultFalse;systemWindow=parent;
+    if(FAILED(result)){state->fail(L"Host UI thread is incompatible with WebView2 COM initialization",result);return kResultTrue;}
+    SetTimer(state->window,2,1000,nullptr);startBrowser(state);return kResultTrue;
 }
 tresult PLUGIN_API Editor::removed(){
-    if(state){state->active=false;state->owner=nullptr;if(state->window){KillTimer(state->window,1);DestroyWindow(state->window);state->window=nullptr;}
+    if(state){state->active=false;state->owner=nullptr;if(state->window){KillTimer(state->window,1);KillTimer(state->window,2);DestroyWindow(state->window);state->window=nullptr;}
         if(state->browserController)state->browserController->Close();state->browser.Reset();state->browserController.Reset();state->environment.Reset();if(state->comInitialized){CoUninitialize();state->comInitialized=false;}}
     systemWindow=nullptr;return kResultTrue;
 }

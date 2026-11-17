@@ -36,3 +36,32 @@ Fonts are hosted locally; their SIL Open Font License notices are in `public/fon
 ## Validation
 
 Production build verified with `npm run build`. Chromium smoke checks covered knob adjustment, undo/redo, comparison copying, presets, save persistence across reload, switches, audio start/stop, bypass, and desktop/mobile layouts (1440px and 390px) without horizontal overflow or JavaScript errors.
+
+## VST3 0.1.1: parameter and meter mapping
+
+The native meter reads the processed DAW signal, not knob positions. With audio
+playing, **GR** shows compressor attenuation in dB: no reduction rests at 0;
+increasing Peak Reduction moves the needle left as attenuation increases.
+The needle follows the printed nonlinear dB scale. **IN/OUT** use RMS levels,
+calibrated so -18 dBFS RMS equals 0 VU. Values below -20 VU or above +3 VU
+reach the scale limits. The GR scale reaches its limit at 20 dB reduction.
+
+- Gain is post-compression makeup: 4.08 is unity; one unit adds 6 dB.
+- Peak Reduction lowers the detector threshold; it does not indicate dB itself.
+- HI FREQ at 100 is flat. Lower values emphasize high-frequency detector input
+  and reduce low-frequency sensitivity; this is not an audio-path EQ.
+- COMP uses a 3:1 ratio; LIMITER uses 100:1 with a narrower knee.
+- Mix blends dry/wet before Trim. At 0%, OUT is dry (plus Trim), while GR
+  still measures compression inside the wet path.
+- Trim adjusts final output by -18 to +18 dB, without changing IN or GR.
+- Analog selects intentional 50/60 Hz hum or OFF. Bypass passes the dry signal
+  and indicates zero GR. Host automation uses discrete switch values.
+
+The browser audio demo is a separate Web Audio approximation, not the native
+DSP. Both use the same needle-scale calibration. Native startup now displays
+loading/failure information instead of leaving only an unexplained black area;
+this does not establish a loading-time improvement on any particular DAW.
+
+Run `node --test tests/*.test.js` for preset and printed-meter calibration tests.
+The native suite additionally sweeps Peak Reduction and checks GR against
+measured attenuation, IN/OUT calibration, Gain, Trim, Mix, bypass and HF contour.

@@ -19,7 +19,8 @@ inline Values initialValues() {
     return values;
 }
 inline double clampValue(std::size_t i, double value) {
-    return std::isfinite(value) ? std::clamp(value,specs[i].min,specs[i].max) : specs[i].initial;
+    const auto bounded=std::isfinite(value) ? std::clamp(value,specs[i].min,specs[i].max) : specs[i].initial;
+    return i>=Meter ? std::round(bounded) : bounded;
 }
 inline double normalize(std::size_t i, double value) {
     return (clampValue(i,value)-specs[i].min)/(specs[i].max-specs[i].min);

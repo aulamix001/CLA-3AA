@@ -16,7 +16,7 @@ public:
     void acceptValues(const Values&);
     Values currentValues();
     void requestMeters();
-    std::array<double,3> meters {{-120.,-120.,0.}};
+    std::array<std::atomic<double>,3> meters {{-120.,-120.,0.}};
 };
 struct EditorState;
 class Editor final : public Steinberg::CPluginView {
