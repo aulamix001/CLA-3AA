@@ -84,6 +84,8 @@ static void startBrowser(const std::shared_ptr<EditorState>& state){
         environment->CreateCoreWebView2Controller(s->window,Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>([weak](HRESULT result,ICoreWebView2Controller* controller)->HRESULT{
           auto s=weak.lock();if(!s||!s->active)return S_OK;if(FAILED(result)||!controller)return S_OK;
           s->browserController=controller;controller->get_CoreWebView2(&s->browser);
+          ComPtr<ICoreWebView2Controller3> pixels;
+          if(SUCCEEDED(s->browserController.As(&pixels))){pixels->put_ShouldDetectMonitorScaleChanges(FALSE);pixels->put_RasterizationScale(1.0);pixels->put_BoundsMode(COREWEBVIEW2_BOUNDS_MODE_USE_RAW_PIXELS);}
           RECT bounds;GetClientRect(s->window,&bounds);controller->put_Bounds(bounds);controller->put_IsVisible(TRUE);
           ComPtr<ICoreWebView2Settings> settings;s->browser->get_Settings(&settings);settings->put_AreDevToolsEnabled(FALSE);settings->put_AreDefaultContextMenusEnabled(FALSE);settings->put_IsStatusBarEnabled(FALSE);settings->put_IsZoomControlEnabled(FALSE);
           ComPtr<ICoreWebView2_8> audio;if(SUCCEEDED(s->browser.As(&audio)))audio->put_IsMuted(TRUE);

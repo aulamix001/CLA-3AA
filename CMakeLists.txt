@@ -19,6 +19,10 @@ FetchContent_Declare(vst3sdk
     GIT_SUBMODULES_RECURSE OFF
 )
 FetchContent_MakeAvailable(vst3sdk)
+# The SDK's plug-in packaging functions need these in the caller's scope.
+set(SDK_ROOT "${vst3sdk_SOURCE_DIR}")
+set(public_sdk_SOURCE_DIR "${SDK_ROOT}/public.sdk")
+set(pluginterfaces_SOURCE_DIR "${SDK_ROOT}/pluginterfaces")
 FetchContent_Declare(webview2
     URL https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.4314.35/microsoft.web.webview2.1.0.4314.35.nupkg
     URL_HASH SHA256=90778deb1b77e36292828b4b5833c9255c27533f40e0ddd55891ae718944edc4
